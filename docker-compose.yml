@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: farecast_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-farecast}
+      POSTGRES_USER: ${POSTGRES_USER:-farecast_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-farecast_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farecast_user} -d ${POSTGRES_DB:-farecast}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI Backend ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: farecast_backend
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python -m backend.app.db.init_db &&
+             uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  # ── React Frontend ──────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: farecast_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

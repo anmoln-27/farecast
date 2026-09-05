@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.egg-info/
+.eggs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# Data — raw data files are NOT committed; only schema/scripts are
+data/raw/*.csv
+data/raw/*.xlsx
+data/raw/*.parquet
+data/processed/*.csv
+data/processed/*.parquet
+data/external/*.csv
+
+# Models — large binary model files
+models/*.joblib
+models/*.pkl
+models/*.h5
+
+# Docker volumes
+postgres_data/
+
+# Node / React
+node_modules/
+frontend/build/
+frontend/dist/
+.npm/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
