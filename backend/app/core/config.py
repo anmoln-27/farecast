@@ -7,7 +7,7 @@ All runtime settings are loaded from environment variables / .env file.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     DEMO_MODE: bool = True           # True = use historical data, skip live APIs
 
     # ── Database ──────────────────────────────────────────────────────────────
+    DATABASE_URL_OVERRIDE: Optional[str] = Field(default=None, alias="DATABASE_URL")
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "farecast"
@@ -35,6 +36,8 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[misc]
     @property
     def DATABASE_URL(self) -> str:
+        if self.DATABASE_URL_OVERRIDE:
+            return self.DATABASE_URL_OVERRIDE
         return (
             f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

@@ -17,8 +17,15 @@ class Base(DeclarativeBase):
 
 def get_engine(echo: bool = False):
     settings = get_settings()
+    url = settings.DATABASE_URL
+    if "sqlite" in url:
+        return create_engine(
+            url,
+            echo=echo,
+            connect_args={"check_same_thread": False},
+        )
     return create_engine(
-        settings.DATABASE_URL,
+        url,
         echo=echo,
         pool_pre_ping=True,
         pool_size=5,

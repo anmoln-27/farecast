@@ -40,8 +40,10 @@ models/*.pkl
 models/*.h5
 catboost_info/
 
-# Docker volumes
+# Docker volumes & SQLite
 postgres_data/
+*.db
+*.sqlite*
 
 # Node / React
 node_modules/
