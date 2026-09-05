@@ -38,6 +38,7 @@ data/external/*.csv
 models/*.joblib
 models/*.pkl
 models/*.h5
+catboost_info/
 
 # Docker volumes
 postgres_data/

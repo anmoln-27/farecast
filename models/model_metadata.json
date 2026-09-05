@@ -1,0 +1,85 @@
+{
+  "model_name": "Random Forest",
+  "training_timestamp": "2026-09-05T21:05:36.288425",
+  "dataset_source": "Kaggle Flight Price Prediction (Shubham Bathwal)",
+  "dataset_path": "C:\\Users\\hp\\OneDrive\\Desktop\\farecast\\data\\raw\\Clean_Dataset.csv",
+  "total_records": 300261,
+  "train_records": 240208,
+  "test_records": 60053,
+  "target_variable": "fare_inr",
+  "features": {
+    "categorical": [
+      "airline",
+      "source_city",
+      "destination_city",
+      "route",
+      "departure_time",
+      "arrival_time",
+      "cabin_class",
+      "booking_window"
+    ],
+    "numerical": [
+      "stops",
+      "duration_minutes",
+      "days_left",
+      "is_peak_departure"
+    ],
+    "all": [
+      "airline",
+      "source_city",
+      "destination_city",
+      "route",
+      "departure_time",
+      "arrival_time",
+      "cabin_class",
+      "booking_window",
+      "stops",
+      "duration_minutes",
+      "days_left",
+      "is_peak_departure"
+    ]
+  },
+  "all_model_benchmarks": {
+    "Linear Regression": {
+      "MAE": 4466.19,
+      "RMSE": 6723.36,
+      "R2": 0.9124,
+      "MAPE": 42.83
+    },
+    "Random Forest": {
+      "MAE": 1834.5,
+      "RMSE": 3615.28,
+      "R2": 0.9747,
+      "MAPE": 12.19
+    },
+    "HistGradientBoosting": {
+      "MAE": 2213.79,
+      "RMSE": 3788.54,
+      "R2": 0.9722,
+      "MAPE": 16.48
+    },
+    "CatBoost": {
+      "MAE": 2351.21,
+      "RMSE": 4042.28,
+      "R2": 0.9683,
+      "MAPE": 16.81
+    }
+  },
+  "champion_metrics": {
+    "MAE": 1834.5,
+    "RMSE": 3615.28,
+    "R2": 0.9747,
+    "MAPE": 12.19
+  },
+  "prediction_range": {
+    "methodology": "80th percentile of absolute test residuals",
+    "residual_margin_inr": 2436.79,
+    "interpretation": "In 80% of unseen historical test observations, the actual airfare was within \u00b1\u20b92437 of the model prediction."
+  },
+  "figures": {
+    "residual_distribution": "C:\\Users\\hp\\OneDrive\\Desktop\\farecast\\docs\\figures\\residual_distribution.png",
+    "actual_vs_predicted": "C:\\Users\\hp\\OneDrive\\Desktop\\farecast\\docs\\figures\\actual_vs_predicted.png",
+    "error_by_airline": "C:\\Users\\hp\\OneDrive\\Desktop\\farecast\\docs\\figures\\error_by_airline.png",
+    "error_by_cabin": "C:\\Users\\hp\\OneDrive\\Desktop\\farecast\\docs\\figures\\error_by_cabin.png"
+  }
+}

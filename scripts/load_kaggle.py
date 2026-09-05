@@ -56,16 +56,27 @@ SOURCE_NAME = "kaggle"
 #   Arrival Time, Destination City, Class, Duration, Days Left, Price
 COLUMN_MAP = {
     "Airline": "airline",
+    "airline": "airline",
     "Flight": "flight_number",
+    "flight": "flight_number",
     "Source City": "source_city",
+    "source_city": "source_city",
     "Departure Time": "departure_time",
+    "departure_time": "departure_time",
     "Stops": "stops",
+    "stops": "stops",
     "Arrival Time": "arrival_time",
+    "arrival_time": "arrival_time",
     "Destination City": "destination_city",
+    "destination_city": "destination_city",
     "Class": "cabin_class",
+    "class": "cabin_class",
     "Duration": "duration_raw",
+    "duration": "duration_raw",
     "Days Left": "days_left",
+    "days_left": "days_left",
     "Price": "fare",
+    "price": "fare",
 }
 
 STOPS_MAP = {
@@ -79,8 +90,8 @@ STOPS_MAP = {
 
 
 def parse_stops(value) -> int:
-    if isinstance(value, int):
-        return value
+    if isinstance(value, (int, float)):
+        return int(value)
     s = str(value).strip().lower()
     return STOPS_MAP.get(s, 0)
 
@@ -121,7 +132,7 @@ def load_kaggle(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) -> dic
 
     # ── Build FareRecord list ─────────────────────────────────────────────────
     records: list[FareRecord] = []
-    for _, row in df.iterrows():
+    for row in df.to_dict("records"):
         try:
             fare_val = float(row.get("fare", 0))
             stops_val = parse_stops(row.get("stops", 0))
