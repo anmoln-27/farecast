@@ -111,7 +111,7 @@ class FareObservation(Base):
     """
     __tablename__ = "fare_observations"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
 
     # Provenance
     source = Column(String(50), nullable=False, index=True)
@@ -246,7 +246,7 @@ class CPIReference(Base):
 class PredictionResult(Base):
     __tablename__ = "prediction_results"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
 
     model_name = Column(String(100), nullable=False)
     model_version = Column(String(50))
@@ -281,7 +281,7 @@ class PredictionResult(Base):
 class Anomaly(Base):
     __tablename__ = "anomalies"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
 
     fare_observation_id = Column(BigInteger, ForeignKey("fare_observations.id"))
 
