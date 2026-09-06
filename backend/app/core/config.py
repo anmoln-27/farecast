@@ -47,11 +47,17 @@ class Settings(BaseSettings):
     AMADEUS_CLIENT_ID: str = ""
     AMADEUS_CLIENT_SECRET: str = ""
     AMADEUS_HOSTNAME: Literal["test", "production"] = "test"
+    AMADEUS_BASE_URL: str = "https://test.api.amadeus.com"
 
     @computed_field  # type: ignore[misc]
     @property
     def amadeus_available(self) -> bool:
-        return bool(self.AMADEUS_CLIENT_ID and self.AMADEUS_CLIENT_SECRET)
+        """True only when both Amadeus credentials are present and DEMO_MODE is off."""
+        return bool(
+            not self.DEMO_MODE
+            and self.AMADEUS_CLIENT_ID
+            and self.AMADEUS_CLIENT_SECRET
+        )
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     FRONTEND_URL: str = "http://localhost:3000"

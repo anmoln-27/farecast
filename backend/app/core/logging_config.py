@@ -26,3 +26,7 @@ def configure_logging() -> None:
     # Quieten noisy third-party loggers
     for noisy in ("httpx", "httpcore", "uvicorn.access"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
+
+
+# Alias used by main.py
+setup_logging = configure_logging
