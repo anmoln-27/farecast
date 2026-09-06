@@ -407,66 +407,53 @@ The `cpi_reference` table stores MoSPI CPI data for the **Transport & Communicat
 
 ---
 
-## 12. Quick Start — Local Setup
+## 12. Quick Start — Local Setup & SIH Demo
 
 ### Prerequisites
-
 - Python 3.11+
-- PostgreSQL 14+
-- Node.js 18+ (for frontend — Phase 5)
+- Node.js 18+ (Node 25 tested) & npm
 
-### Step 1: Clone & Environment
-
+### Step 1: Environment Configuration
 ```bash
-cd farecast
 cp .env.example .env
-# Edit .env with your PostgreSQL credentials
+# DEMO_MODE=true is enabled by default. No external credentials needed for demo.
 ```
 
-### Step 2: Install Python dependencies
-
+### Step 2: Install Dependencies
 ```bash
+# Python dependencies
 pip install -r backend/requirements.txt
+
+# Frontend dependencies
+cd frontend
+npm install
+cd ..
 ```
 
-### Step 3: Place data files
-
+### Step 3: Run Backend Tests
 ```bash
-# Download from Kaggle:
-# https://www.kaggle.com/datasets/shubhambathwal/flight-price-prediction
-# → place Clean_Dataset.csv in data/raw/
-
-# Download from GitHub:
-# https://github.com/Avij112/flight-fare-analysis
-# → place full_fare.csv in data/raw/
-
-# DGCA data (optional):
-# → place dgca_stats.csv in data/external/
+python -m pytest tests/ -v
+# 101 tests passed across data cleaning, ML predictor, index analytics, and FastAPI endpoints.
 ```
 
-### Step 4: Initialise database
-
+### Step 4: Start FastAPI Backend
 ```bash
-python -m backend.app.db.init_db
+uvicorn backend.main:app --reload --port 8000
+# API docs available at: http://localhost:8000/docs
+# Health check: http://localhost:8000/health
 ```
 
-### Step 5: Run data pipeline
-
+### Step 5: Start React Frontend Dashboard
 ```bash
-python scripts/run_pipeline.py
+cd frontend
+npm run dev
+# Dashboard launches at: http://localhost:5173
 ```
 
-### Step 6: Run EDA
-
+### Step 6: Build Frontend for Production
 ```bash
-python notebooks/eda_fare_analysis.py --source kaggle
-python notebooks/eda_fare_analysis.py --source github_full_fare
-```
-
-### Step 7: Run tests
-
-```bash
-pytest tests/ -v
+cd frontend
+npm run build
 ```
 
 ---

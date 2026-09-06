@@ -243,7 +243,7 @@ export default function FareForecast({ defaultOrigin = 'DEL', defaultDestination
 
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', fontWeight: 600 }}>
-                  Expected Range (90% interval)
+                  Model-Based Estimated Fare Range
                 </div>
                 <div
                   style={{
