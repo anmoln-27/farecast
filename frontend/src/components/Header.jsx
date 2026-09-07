@@ -13,6 +13,8 @@ export default function Header({ liveStatus, activeTab, onTabChange }) {
 
   const tabs = [
     { id: 'overview', label: 'Market Overview' },
+    { id: 'elasticity', label: 'Surge & Elasticity' },
+    { id: 'regulatory', label: 'NSO & RBI Regulatory' },
     { id: 'forecast', label: 'Fare Forecast' },
     { id: 'signals', label: 'Market Signals' },
     { id: 'context', label: 'DGCA & MoSPI Context' },

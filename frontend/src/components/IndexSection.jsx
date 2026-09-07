@@ -33,19 +33,19 @@ export default function IndexSection({ indexData, selectedRoute }) {
               Period: {period}
             </div>
             <div className="index-large-val mono-num">
-              {indexValue !== null && indexValue !== undefined ? indexValue.toFixed(1) : '100.0'}
+              {indexValue !== null && indexValue !== undefined ? indexValue.toFixed(1) : '—'}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div
               style={{
-                fontSize: '13px',
+                fontSize: '12px',
                 fontWeight: 600,
                 color: changeVsBaseline === null ? 'var(--text-secondary)' : changeVsBaseline > 0 ? '#991B1B' : '#065F46',
               }}
               className="mono-num"
             >
-              {changeVsBaseline !== null ? formatPercent(changeVsBaseline) : 'Base (100.0)'}
+              {changeVsBaseline !== null ? `${changeVsBaseline > 0 ? '↑' : '↓'} ${formatPercent(changeVsBaseline)}` : 'Index unavailable — insufficient observations'}
             </div>
             <div className="index-baseline-ref">vs. Baseline</div>
           </div>

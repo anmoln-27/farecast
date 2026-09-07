@@ -31,6 +31,8 @@ from backend.app.api.routers import (
     cpi,
     dashboard,
     live,
+    nso_rbi,
+    scrapers,
 )
 
 setup_logging()
@@ -78,6 +80,8 @@ def create_app() -> FastAPI:
     app.include_router(cpi.router)
     app.include_router(dashboard.router)
     app.include_router(live.router)
+    app.include_router(nso_rbi.router)
+    app.include_router(scrapers.router)
 
     logger.info(
         "FARECAST API started | DEMO_MODE=%s | Amadeus=%s",

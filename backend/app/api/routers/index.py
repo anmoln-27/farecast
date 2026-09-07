@@ -27,6 +27,8 @@ _DISCLAIMER = (
 def list_index(
     period: Optional[str] = Query(None, description="Filter by period, e.g. 2022-01"),
     period_type: Optional[str] = Query(None, description="month / quarter / year"),
+    frequency: Optional[str] = Query(None, description="daily / weekly / monthly"),
+    sub_index: Optional[str] = Query(None, description="COMPOSITE / T+1_SPOT / T+7_WEEK / etc."),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -40,6 +42,10 @@ def list_index(
         q = q.filter(AirfareIndex.period == period)
     if period_type:
         q = q.filter(AirfareIndex.period_type == period_type)
+    if frequency:
+        q = q.filter(AirfareIndex.frequency == frequency)
+    if sub_index:
+        q = q.filter(AirfareIndex.sub_index == sub_index)
 
     total = q.count()
     records = q.order_by(AirfareIndex.period.desc()).offset(offset).limit(limit).all()

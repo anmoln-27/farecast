@@ -283,7 +283,7 @@ export default function FareForecast({ defaultOrigin = 'DEL', defaultDestination
               </div>
               <div>
                 <span style={{ color: 'var(--text-muted)' }}>Model Uncertainty:</span>{' '}
-                <strong>&plusmn;{(prediction.prediction_uncertainty_margin * 100).toFixed(0)}%</strong>
+                <strong>&plusmn;{formatINR(prediction.prediction_uncertainty_margin)}</strong>
               </div>
             </div>
 

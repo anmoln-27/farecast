@@ -142,6 +142,13 @@ class FareObservation(Base):
     # Fare
     fare = Column(Float, nullable=False)
     currency = Column(String(5), default="INR")
+    base_fare = Column(Float, nullable=True)
+    taxes = Column(Float, nullable=True)
+    udf_charge = Column(Float, nullable=True)
+    convenience_fee = Column(Float, nullable=True)
+    total_fare = Column(Float, nullable=True)
+    advance_window = Column(String(10), index=True, nullable=True)  # 'T+1', 'T+7', 'T+15', 'T+30', 'T+45'
+    status = Column(String(20), default="AVAILABLE")  # 'AVAILABLE', 'SOLD_OUT', 'CANCELLED'
 
     # Metadata
     collected_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -172,6 +179,9 @@ class AirfareIndex(Base):
 
     period = Column(String(20), nullable=False)  # e.g. "2023-01" or "2023-Q1"
     period_type = Column(String(10), default="month")  # "month", "quarter", "year"
+    frequency = Column(String(10), default="monthly", index=True)  # "daily", "weekly", "monthly"
+    index_formula = Column(String(30), default="Laspeyres")       # "Laspeyres", "Fisher", "Dutot"
+    sub_index = Column(String(20), default="COMPOSITE", index=True) # "COMPOSITE", "T+1_SPOT", "T+7_WEEK", etc.
 
     avg_fare = Column(Float)
     baseline_fare = Column(Float)
@@ -181,9 +191,30 @@ class AirfareIndex(Base):
 
     weight = Column(Float)                   # prototype weight if aggregated
     weight_source = Column(String(100))      # "prototype" / official source note
+    dgca_weight = Column(Float, nullable=True) # DGCA passenger traffic weight
 
     data_source = Column(String(100))
     calculated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─────────────────────────────────────────────
+# DGCA Route Fare Benchmark
+# ─────────────────────────────────────────────
+
+class DGCARouteFareBenchmark(Base):
+    """
+    Official DGCA monthly/daily route average fares for top sectors
+    for 30+ day backtesting and tracking error evaluation.
+    """
+    __tablename__ = "dgca_route_fare_benchmarks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    route = Column(String(20), nullable=False, index=True)
+    observation_date = Column(Date, nullable=False, index=True)
+    avg_fare = Column(Float, nullable=False)
+    pax_count = Column(Integer, default=0)
+    source = Column(String(100), default="DGCA_MONTHLY_MONITORING")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 # ─────────────────────────────────────────────

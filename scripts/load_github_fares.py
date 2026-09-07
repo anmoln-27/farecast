@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from datetime import date
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -36,6 +37,18 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CSV_PATH = PROJECT_ROOT / "data" / "raw" / "full_fare.csv"
 SOURCE_NAME = "github_full_fare"
+
+AIRLINE_TO_IATA = {
+    "indigo": "6E",
+    "vistara": "UK",
+    "air india": "AI",
+    "airindia": "AI",
+    "spicejet": "SG",
+    "airasia": "I5",
+    "air asia": "I5",
+    "go first": "G8",
+    "akasa air": "QP",
+}
 
 
 def _detect_columns(df: pd.DataFrame) -> dict:
@@ -109,9 +122,22 @@ def _detect_columns(df: pd.DataFrame) -> dict:
             break
 
     # Arrival time
-    for candidate in ["arr_time", "arrival_time", "arr_hour"]:
+    # Route (combined origin/destination)
+    for candidate in ["route", "sector", "pair"]:
         if candidate in cols:
-            mapping["arrival_time"] = cols[candidate]
+            mapping["route"] = cols[candidate]
+            break
+
+    # Direction
+    for candidate in ["direction", "dir"]:
+        if candidate in cols:
+            mapping["direction"] = cols[candidate]
+            break
+
+    # Year
+    for candidate in ["year", "yr"]:
+        if candidate in cols:
+            mapping["year"] = cols[candidate]
             break
 
     return mapping
@@ -133,7 +159,7 @@ def load_github_fares(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) 
         return {"status": "file_not_found", "path": str(csv_path)}
 
     logger.info(f"Loading GitHub fare data from: {csv_path}")
-    df = pd.read_csv(csv_path, low_memory=False)
+    df = pd.read_csv(csv_path, low_memory=False, encoding="utf-8")
 
     logger.info(f"Raw shape: {df.shape}")
     logger.info(f"Columns detected: {list(df.columns)}")
@@ -158,7 +184,20 @@ def load_github_fares(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) 
             origin = str(row.get(col_map.get("origin", ""), "")).strip()
             destination = str(row.get(col_map.get("destination", ""), "")).strip()
 
-            airline_raw = str(row.get(col_map.get("airline", ""), "")).strip()
+            if (not origin or not destination) and "route" in col_map:
+                raw_route = str(row.get(col_map["route"], "")).strip()
+                sep = "↔" if "↔" in raw_route else ("-" if "-" in raw_route else None)
+                if sep and sep in raw_route:
+                    parts = [p.strip() for p in raw_route.split(sep)]
+                    if len(parts) == 2:
+                        direction = str(row.get(col_map.get("direction", ""), "→")).strip()
+                        if direction in ("←", "<-", "inbound", "return"):
+                            origin, destination = parts[1], parts[0]
+                        else:
+                            origin, destination = parts[0], parts[1]
+
+            raw_airline = str(row.get(col_map.get("airline", ""), "")).strip()
+            airline_code = AIRLINE_TO_IATA.get(raw_airline.lower(), raw_airline)
 
             # Travel date
             travel_date = None
@@ -167,6 +206,14 @@ def load_github_fares(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) 
                 if pd.notna(raw_date):
                     try:
                         travel_date = pd.to_datetime(raw_date).date()
+                    except Exception:
+                        travel_date = None
+            elif "year" in col_map:
+                raw_yr = row.get(col_map["year"])
+                if pd.notna(raw_yr):
+                    try:
+                        yr = int(float(raw_yr))
+                        travel_date = date(yr, 6, 15)
                     except Exception:
                         travel_date = None
 
@@ -180,7 +227,6 @@ def load_github_fares(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) 
             duration_min = None
             if dur_raw is not None and pd.notna(dur_raw):
                 try:
-                    # Try treating as hours float
                     hrs = float(str(dur_raw).replace("h", "").replace("m", "").strip())
                     duration_min = int(hrs * 60) if hrs < 24 else int(hrs)
                 except ValueError:
@@ -188,12 +234,12 @@ def load_github_fares(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) 
 
             cabin_raw = str(row.get(col_map.get("cabin_class", ""), "Economy")).strip()
             days_left_raw = row.get(col_map.get("days_left", ""))
-            days_left = None
+            days_left = 30  # standard reference lead time
             if days_left_raw is not None and pd.notna(days_left_raw):
                 try:
                     days_left = int(float(days_left_raw))
                 except (TypeError, ValueError):
-                    pass
+                    days_left = 30
 
             dep_time = str(row.get(col_map.get("departure_time", ""), "")).strip() or None
             arr_time = str(row.get(col_map.get("arrival_time", ""), "")).strip() or None
@@ -201,7 +247,7 @@ def load_github_fares(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) 
             rec = FareRecord(
                 source=SOURCE_NAME,
                 data_mode="HISTORICAL",
-                airline_code=airline_raw or None,
+                airline_code=airline_code or None,
                 origin=origin,
                 destination=destination,
                 travel_date=travel_date,
@@ -211,8 +257,11 @@ def load_github_fares(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) 
                 duration_minutes=duration_min,
                 cabin_class=cabin_raw,
                 fare=fare_val,
+                total_fare=fare_val,
                 currency="INR",
                 days_left=days_left,
+                advance_window="T+30",
+                status="AVAILABLE",
             )
             records.append(rec)
 
@@ -278,8 +327,11 @@ def _persist(records: list[FareRecord]) -> None:
                 duration_minutes=rec.duration_minutes,
                 cabin_class=cc,
                 fare=rec.fare,
+                total_fare=rec.total_fare,
                 currency=rec.currency,
                 days_left=rec.days_left,
+                advance_window=rec.advance_window,
+                status=rec.status or "AVAILABLE",
             )
             batch.append(obs)
 

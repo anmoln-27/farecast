@@ -113,6 +113,7 @@ def live_search(
     adults: int = Query(default=1, ge=1, le=9),
     travel_class: str = Query(default="ECONOMY", description="ECONOMY / BUSINESS / FIRST"),
     max_results: int = Query(default=10, ge=1, le=50),
+    persist: bool = Query(default=True, description="Persist live search results to fare_observations"),
     settings: Settings = Depends(get_settings),
     db: Session = Depends(get_db),
 ) -> LiveSearchResponse:
@@ -165,6 +166,9 @@ def live_search(
         )
 
     offers = [LiveFareOffer(**o) for o in raw_offers]
+    persisted_count = 0
+    if persist and offers:
+        persisted_count = _persist_live_offers(db, offers, departure_date)
 
     return LiveSearchResponse(
         data_mode="LIVE",
@@ -172,7 +176,104 @@ def live_search(
         disclaimer=_AMADEUS_DISCLAIMER,
         offers=offers,
         total=len(offers),
+        persisted_count=persisted_count,
     )
+
+
+def _persist_live_offers(
+    db: Session,
+    offers: list[LiveFareOffer],
+    departure_date_str: str,
+) -> int:
+    """
+    Persist verified live Amadeus offers to fare_observations table under DataMode.LIVE.
+    Ensures airline existence and maps advance purchase windows.
+    """
+    from backend.app.db.models import Airline, CabinClass, DataMode
+
+    try:
+        travel_dt = date.fromisoformat(departure_date_str)
+    except Exception:
+        return 0
+
+    today = date.today()
+    days_left = max(0, (travel_dt - today).days)
+    if days_left <= 1:
+        adv_win = "T+1"
+    elif days_left <= 7:
+        adv_win = "T+7"
+    elif days_left <= 15:
+        adv_win = "T+15"
+    elif days_left <= 30:
+        adv_win = "T+30"
+    else:
+        adv_win = "T+45"
+
+    cabin_map = {
+        "economy": CabinClass.ECONOMY,
+        "premium economy": CabinClass.PREMIUM_ECONOMY,
+        "business": CabinClass.BUSINESS,
+        "first": CabinClass.FIRST,
+    }
+
+    persisted = 0
+    for o in offers:
+        try:
+            # Ensure airline code exists
+            code = (o.airline_code or "6E").upper()
+            existing_airline = db.query(Airline).filter_by(code=code).first()
+            if not existing_airline:
+                db.add(Airline(code=code, name=code, country="India"))
+                db.flush()
+
+            cabin_enum = cabin_map.get(o.cabin_class.lower(), CabinClass.ECONOMY)
+            fare_val = float(o.fare_inr_estimate if o.fare_inr_estimate is not None else o.fare)
+            curr = "INR" if o.fare_inr_estimate is not None else (o.currency or "INR")
+
+            dep_time = None
+            if o.departure_datetime and len(o.departure_datetime) >= 16:
+                dep_time = o.departure_datetime[11:16]
+
+            arr_time = None
+            if o.arrival_datetime and len(o.arrival_datetime) >= 16:
+                arr_time = o.arrival_datetime[11:16]
+
+            obs = FareObservation(
+                source="amadeus",
+                data_mode=DataMode.LIVE,
+                airline_code=code,
+                origin=o.origin.upper(),
+                destination=o.destination.upper(),
+                travel_date=travel_dt,
+                booking_date=today,
+                departure_time=dep_time,
+                arrival_time=arr_time,
+                stops=o.stops or 0,
+                duration_minutes=o.duration_minutes,
+                cabin_class=cabin_enum,
+                fare=fare_val,
+                currency=curr,
+                total_fare=fare_val,
+                advance_window=adv_win,
+                days_left=days_left,
+                status="AVAILABLE",
+                collected_at=o.collected_at or datetime.now(timezone.utc),
+            )
+            db.add(obs)
+            persisted += 1
+        except Exception as exc:
+            logger.warning("Failed to persist live fare offer: %s", exc)
+
+    if persisted > 0:
+        try:
+            db.commit()
+            logger.info("Persisted %d LIVE airfare observations from Amadeus.", persisted)
+        except Exception as exc:
+            db.rollback()
+            logger.error("DB rollback on persisting live offers: %s", exc)
+            return 0
+
+    return persisted
 
 
 # ─── Demo fallback ────────────────────────────────────────────────────────────

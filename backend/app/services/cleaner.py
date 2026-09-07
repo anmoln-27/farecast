@@ -203,7 +203,38 @@ def clean_fare_records(
         if rec.arrival_time:
             rec.arrival_time = normalise_time_period(rec.arrival_time)
 
-        # ── 9. Deduplication ──────────────────────────────────────────────────
+        # ── 9. Disaggregated fare consistency & Advance Window ───────────────
+        if rec.advance_window is None and rec.days_left is not None:
+            if rec.days_left <= 1:
+                rec.advance_window = "T+1"
+            elif rec.days_left <= 7:
+                rec.advance_window = "T+7"
+            elif rec.days_left <= 15:
+                rec.advance_window = "T+15"
+            elif rec.days_left <= 30:
+                rec.advance_window = "T+30"
+            else:
+                rec.advance_window = "T+45"
+
+        # Check disaggregation consistency: Base + Taxes + UDF + ConvFee == Total
+        if (
+            rec.base_fare is not None
+            and rec.taxes is not None
+            and rec.udf_charge is not None
+            and rec.convenience_fee is not None
+        ):
+            component_sum = round(rec.base_fare + rec.taxes + rec.udf_charge + rec.convenience_fee, 2)
+            if abs(component_sum - rec.fare) > 0.05:
+                # Re-align taxes to ensure exact balance with total fare
+                rec.taxes = round(rec.fare - rec.base_fare - rec.udf_charge - rec.convenience_fee, 2)
+        rec.total_fare = rec.fare
+
+        # Exclude sold out or cancelled flights from clean fare basket
+        if rec.status and rec.status.upper() in {"SOLD_OUT", "CANCELLED"}:
+            report.dropped_impossible_fare += 1
+            continue
+
+        # ── 10. Deduplication ─────────────────────────────────────────────────
         fp = rec.fingerprint()
         if fp in seen_fingerprints:
             report.dropped_duplicates += 1
@@ -215,3 +246,41 @@ def clean_fare_records(
     report.output_count = len(cleaned)
     logger.info(report.summary())
     return cleaned, report
+
+
+def detect_route_window_outliers(
+    records: list[FareRecord],
+    iqr_multiplier: float = 2.5,
+) -> list[FareRecord]:
+    """
+    Remove extreme statistical fare outliers per route and advance-purchase window
+    bucket to prevent artificial distortion of price indices.
+    """
+    if len(records) < 10:
+        return records
+
+    from collections import defaultdict
+    import numpy as np
+
+    grouped: dict[tuple[str, str, Optional[str]], list[FareRecord]] = defaultdict(list)
+    for r in records:
+        key = (r.origin, r.destination, r.advance_window)
+        grouped[key].append(r)
+
+    filtered_records: list[FareRecord] = []
+    for key, group in grouped.items():
+        if len(group) < 5:
+            filtered_records.extend(group)
+            continue
+
+        fares = np.array([r.fare for r in group], dtype=float)
+        q25, q75 = np.percentile(fares, 25), np.percentile(fares, 75)
+        iqr = q75 - q25
+        lower_bound = max(FARE_MIN_INR, q25 - iqr_multiplier * iqr)
+        upper_bound = min(FARE_MAX_INR, q75 + iqr_multiplier * iqr)
+
+        for r in group:
+            if lower_bound <= r.fare <= upper_bound:
+                filtered_records.append(r)
+
+    return filtered_records

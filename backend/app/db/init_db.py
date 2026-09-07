@@ -66,11 +66,56 @@ SEED_CPI = [
 ]
 
 
+def migrate_columns() -> None:
+    """Safely add any newly introduced columns to existing SQLite tables."""
+    eng = engine()
+    with eng.connect() as conn:
+        # Check fare_observations columns
+        try:
+            res = conn.execute(text("PRAGMA table_info(fare_observations)")).fetchall()
+            existing_cols = {row[1] for row in res}
+            new_cols = [
+                ("base_fare", "FLOAT"),
+                ("taxes", "FLOAT"),
+                ("udf_charge", "FLOAT"),
+                ("convenience_fee", "FLOAT"),
+                ("total_fare", "FLOAT"),
+                ("advance_window", "VARCHAR(10)"),
+                ("status", "VARCHAR(20) DEFAULT 'AVAILABLE'"),
+            ]
+            for col_name, col_type in new_cols:
+                if col_name not in existing_cols:
+                    conn.execute(text(f"ALTER TABLE fare_observations ADD COLUMN {col_name} {col_type}"))
+                    logger.info(f"Added column {col_name} to fare_observations.")
+            conn.commit()
+        except Exception as exc:
+            logger.warning(f"Migration for fare_observations: {exc}")
+
+        # Check airfare_index columns
+        try:
+            res = conn.execute(text("PRAGMA table_info(airfare_index)")).fetchall()
+            existing_cols = {row[1] for row in res}
+            new_cols = [
+                ("frequency", "VARCHAR(10) DEFAULT 'monthly'"),
+                ("index_formula", "VARCHAR(30) DEFAULT 'Laspeyres'"),
+                ("sub_index", "VARCHAR(20) DEFAULT 'COMPOSITE'"),
+                ("dgca_weight", "FLOAT"),
+            ]
+            for col_name, col_type in new_cols:
+                if col_name not in existing_cols:
+                    conn.execute(text(f"ALTER TABLE airfare_index ADD COLUMN {col_name} {col_type}"))
+                    logger.info(f"Added column {col_name} to airfare_index.")
+            conn.commit()
+        except Exception as exc:
+            logger.warning(f"Migration for airfare_index: {exc}")
+
+
 def create_tables() -> None:
     """Create all tables defined in the ORM models."""
     logger.info("Creating database tables...")
     Base.metadata.create_all(bind=engine())
-    logger.info("Tables created successfully.")
+    migrate_columns()
+    logger.info("Tables created and migrated successfully.")
 
 
 def seed_airlines(session) -> None:

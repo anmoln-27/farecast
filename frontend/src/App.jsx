@@ -11,6 +11,9 @@ import FareForecast from './components/FareForecast';
 import MarketSignals from './components/MarketSignals';
 import AviationContext from './components/AviationContext';
 import LiveSearchSection from './components/LiveSearchSection';
+import LeadTimeElasticityChart from './charts/LeadTimeElasticityChart';
+import SectorHeatmap from './charts/SectorHeatmap';
+import NsoRbiPortal from './components/NsoRbiPortal';
 import { api } from './services/api';
 
 export default function App() {
@@ -266,6 +269,16 @@ export default function App() {
               </div>
             </div>
 
+            {/* Lead-Time Elasticity Surge Curve */}
+            <div style={{ marginTop: '24px' }}>
+              <LeadTimeElasticityChart />
+            </div>
+
+            {/* Sector Surge Pricing Heatmap */}
+            <div style={{ marginTop: '24px' }}>
+              <SectorHeatmap />
+            </div>
+
             {/* Inline Forecast Section */}
             <div style={{ marginTop: '24px' }}>
               <FareForecast
@@ -290,7 +303,22 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 2: Dedicated Fare Forecast */}
+        {/* Tab: Surge & Elasticity Heatmaps */}
+        {activeTab === 'elasticity' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginTop: '12px' }}>
+            <LeadTimeElasticityChart />
+            <SectorHeatmap />
+          </div>
+        )}
+
+        {/* Tab: Dedicated NSO & RBI Regulatory Intelligence Portal */}
+        {activeTab === 'regulatory' && (
+          <div style={{ marginTop: '12px' }}>
+            <NsoRbiPortal />
+          </div>
+        )}
+
+        {/* Tab: Dedicated Fare Forecast */}
         {activeTab === 'forecast' && (
           <div style={{ marginTop: '12px' }}>
             <FareForecast
@@ -300,14 +328,14 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 3: Dedicated Market Signals */}
+        {/* Tab: Dedicated Market Signals */}
         {activeTab === 'signals' && (
           <div style={{ marginTop: '12px' }}>
             <MarketSignals anomalies={anomaliesData} loading={loading} />
           </div>
         )}
 
-        {/* Tab 4: DGCA & MoSPI Context */}
+        {/* Tab: DGCA & MoSPI Context */}
         {activeTab === 'context' && (
           <div style={{ marginTop: '12px' }}>
             <AviationContext
@@ -318,7 +346,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 5: Live Amadeus Search */}
+        {/* Tab: Live Amadeus Search */}
         {activeTab === 'live' && (
           <div style={{ marginTop: '12px' }}>
             <LiveSearchSection liveStatus={liveStatus} />

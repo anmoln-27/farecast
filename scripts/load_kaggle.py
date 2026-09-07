@@ -105,7 +105,20 @@ def parse_duration_kaggle(value) -> int | None:
         return None
 
 
-def load_kaggle(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) -> dict:
+AIRLINE_TO_IATA = {
+    "spicejet": "SG",
+    "airasia": "I5",
+    "air asia": "I5",
+    "vistara": "UK",
+    "go first": "G8",
+    "go_first": "G8",
+    "indigo": "6E",
+    "air india": "AI",
+    "air_india": "AI",
+}
+
+
+def load_kaggle(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False, limit: int | None = None) -> dict:
     """
     Load, clean, and (optionally) persist Kaggle fare data.
 
@@ -130,6 +143,20 @@ def load_kaggle(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) -> dic
     rename = {k: v for k, v in COLUMN_MAP.items() if k in df.columns}
     df = df.rename(columns=rename)
 
+    if limit and limit < len(df):
+        # Stratify evenly across all origin-destination pairs to ensure complete network representation
+        if "source_city" in df.columns and "destination_city" in df.columns:
+            n_routes = len(df.groupby(["source_city", "destination_city"])) or 30
+            per_route = max(10, limit // n_routes)
+            groups = [grp.sample(min(len(grp), per_route), random_state=42) for _, grp in df.groupby(["source_city", "destination_city"])]
+            df = pd.concat(groups, ignore_index=True)
+            logger.info(f"Stratified sampling: selected {len(df)} records across {len(groups)} route pairs ({per_route}/route).")
+        else:
+            df = df.sample(limit, random_state=42)
+
+    # Base date for Kaggle historical collection (Feb 11, 2022)
+    base_date = date(2022, 2, 11)
+
     # ── Build FareRecord list ─────────────────────────────────────────────────
     records: list[FareRecord] = []
     for row in df.to_dict("records"):
@@ -137,26 +164,35 @@ def load_kaggle(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) -> dic
             fare_val = float(row.get("fare", 0))
             stops_val = parse_stops(row.get("stops", 0))
             duration_min = parse_duration_kaggle(row.get("duration_raw"))
-            days_left_val = int(row.get("days_left", 0)) if pd.notna(row.get("days_left")) else None
+            days_left_val = int(row.get("days_left", 0)) if pd.notna(row.get("days_left")) else 1
+            raw_airline = str(row.get("airline", "")).strip()
+            airline_code = AIRLINE_TO_IATA.get(raw_airline.lower(), raw_airline)
+            travel_dt = base_date + pd.Timedelta(days=days_left_val)
 
             rec = FareRecord(
                 source=SOURCE_NAME,
                 data_mode="HISTORICAL",
-                airline_code=str(row.get("airline", "")).strip(),
+                airline_code=airline_code,
                 flight_number=str(row.get("flight_number", "")).strip() or None,
                 origin=str(row.get("source_city", "")).strip(),
                 destination=str(row.get("destination_city", "")).strip(),
-                travel_date=None,    # Kaggle dataset has no absolute travel date
-                booking_date=None,
+                travel_date=travel_dt.date() if hasattr(travel_dt, "date") else travel_dt,
+                booking_date=base_date,
                 departure_time=str(row.get("departure_time", "")).strip() or None,
                 arrival_time=str(row.get("arrival_time", "")).strip() or None,
                 stops=stops_val,
                 duration_minutes=duration_min,
                 cabin_class=str(row.get("cabin_class", "Economy")).strip(),
                 fare=fare_val,
+                total_fare=fare_val,
+                base_fare=None,    # Source only provides total price
+                taxes=None,
+                udf_charge=None,
+                convenience_fee=None,
                 currency="INR",
                 days_left=days_left_val,
-                collected_at=None,  # no fabricated timestamp
+                status="AVAILABLE",
+                collected_at=None,
             )
             records.append(rec)
         except Exception as exc:
@@ -188,13 +224,12 @@ def load_kaggle(csv_path: Path = DEFAULT_CSV_PATH, dry_run: bool = False) -> dic
 
 
 def _persist(records: list[FareRecord]) -> None:
-    """Bulk-insert cleaned records into PostgreSQL."""
+    """Bulk-insert cleaned records into SQLite/PostgreSQL."""
     from backend.app.db.base import SessionLocal
     from backend.app.db.models import FareObservation, DataMode, CabinClass
 
     session = SessionLocal()()
     try:
-        # Clear existing Kaggle records to allow re-runs
         deleted = session.query(FareObservation).filter_by(source="kaggle").delete()
         logger.info(f"Cleared {deleted} existing Kaggle records.")
 
@@ -225,6 +260,13 @@ def _persist(records: list[FareRecord]) -> None:
                 duration_minutes=rec.duration_minutes,
                 cabin_class=cc,
                 fare=rec.fare,
+                total_fare=rec.total_fare,
+                base_fare=rec.base_fare,
+                taxes=rec.taxes,
+                udf_charge=rec.udf_charge,
+                convenience_fee=rec.convenience_fee,
+                advance_window=rec.advance_window,
+                status=rec.status or "AVAILABLE",
                 currency=rec.currency,
                 days_left=rec.days_left,
                 collected_at=rec.collected_at,
@@ -251,17 +293,16 @@ def _persist(records: list[FareRecord]) -> None:
         session.close()
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 
     parser = argparse.ArgumentParser(description="Load Kaggle flight price dataset")
     parser.add_argument("--path", type=Path, default=DEFAULT_CSV_PATH)
+    parser.add_argument("--limit", type=int, default=None, help="Limit rows loaded (default: load all)")
     parser.add_argument("--dry-run", action="store_true", help="Parse and clean only; do not write to DB")
     args = parser.parse_args()
 
-    result = load_kaggle(args.path, dry_run=args.dry_run)
+    result = load_kaggle(args.path, dry_run=args.dry_run, limit=args.limit)
     print("\n=== Kaggle Load Summary ===")
     for k, v in result.items():
         print(f"  {k}: {v}")

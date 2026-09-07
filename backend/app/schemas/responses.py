@@ -106,6 +106,10 @@ class IndexRecord(BaseModel):
     airline: Optional[str] = None
     period: str
     period_type: Optional[str] = None
+    frequency: Optional[str] = None
+    index_formula: Optional[str] = None
+    sub_index: Optional[str] = None
+    dgca_weight: Optional[float] = None
     avg_fare: Optional[float] = None
     baseline_fare: Optional[float] = None
     index_value: Optional[float] = None
@@ -270,6 +274,7 @@ class LiveSearchResponse(BaseModel):
     disclaimer: str
     offers: List[LiveFareOffer]
     total: int
+    persisted_count: int = 0
 
 
 class LiveStatusResponse(BaseModel):

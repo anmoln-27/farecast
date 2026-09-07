@@ -72,6 +72,16 @@ export const api = {
     return request(`/api/fares${qs ? `?${qs}` : ''}`);
   },
 
+  getLeadTimeElasticity: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.origin) query.append('origin', params.origin);
+    if (params.destination) query.append('destination', params.destination);
+    const qs = query.toString();
+    return request(`/api/fares/elasticity${qs ? `?${qs}` : ''}`);
+  },
+
+  getSectorMatrix: () => request('/api/fares/sector-matrix'),
+
   // Prototype Index
   getIndex: (params = {}) => {
     const query = new URLSearchParams();
@@ -150,4 +160,27 @@ export const api = {
 
     return request(`/api/live/search?${query.toString()}`);
   },
+
+  // NSO & RBI Regulatory Consumption API
+  getNsoApix: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.frequency) query.append('frequency', params.frequency);
+    if (params.sub_index) query.append('sub_index', params.sub_index);
+    if (params.route) query.append('route', params.route);
+    if (params.period) query.append('period', params.period);
+    const qs = query.toString();
+    return request(`/api/v1/nso/apix${qs ? `?${qs}` : ''}`);
+  },
+
+  getNsoExportUrl: (frequency = 'monthly') => {
+    return `${API_BASE_URL}/api/v1/nso/apix/export?frequency=${encodeURIComponent(frequency)}`;
+  },
+
+  getRbiMacroFeed: () => request('/api/v1/rbi/macro-feed'),
+
+  getBacktestResults: (mode = 'empirical') => request(`/api/v1/analytics/backtest-results?mode=${encodeURIComponent(mode)}`),
+
+  // Scraper compliance audit
+  getScraperCompliance: () => request('/api/scrapers/compliance'),
 };
+
