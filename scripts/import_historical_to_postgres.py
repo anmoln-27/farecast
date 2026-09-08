@@ -40,6 +40,7 @@ def import_genuine_historical_data(
     """
     Imports the genuine historical dataset from data/historical_observations.json.gz.
     """
+    from sqlalchemy import func, text
     from backend.app.db.base import SessionLocal
     from backend.app.db.models import (
         AirfareIndex,
@@ -133,7 +134,6 @@ def import_genuine_historical_data(
                 "TRUJET": "Trujet",
             }
 
-            from sqlalchemy import func, text
             max_obs_id = session.query(func.max(FareObservation.id)).scalar() or 0
             current_obs_id = max_obs_id
 
