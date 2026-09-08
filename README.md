@@ -553,12 +553,13 @@ pytest tests/ --cov=backend --cov-report=term-missing
 
 1. **Kaggle data is historical** — it does not represent current market pricing.
 2. **GitHub fare data is 2022–2023 observations only** — it should not be extrapolated to other periods.
-3. **Amadeus does not cover the complete Indian airfare market** — only participating GDS-connected fares.
-4. **DGCA provides aviation activity statistics, not ticket fares** — these data types are not mixed.
-5. **The Prototype Airfare Price Index is not an official Government of India index** — it uses prototype weights and methodology.
-6. **Model accuracy is computed from actual evaluation** — no accuracy claims are fabricated.
-7. **Missing or unavailable data is not fabricated** — empty states are displayed with meaningful messages.
-8. **CPI airfare-specific component weights are not officially published in usable form** — prototype weights are used and clearly labelled.
+3. **Ignav & Amadeus coverage** — Live queries reflect provider availability; background polling is avoided to preserve API credits.
+4. **Ethical scraping boundaries** — Scrapers strictly honor `robots.txt` and rate limits; commercial anti-bot WAFs (Cloudflare, Akamai) are respected and never bypassed.
+5. **DGCA provides aviation activity statistics, not ticket fares** — these data types are never conflated.
+6. **The Prototype Airfare Price Index is not an official Government of India index** — it uses research/prototype weights derived from domestic passenger shares.
+7. **Model accuracy is computed from actual evaluation** — no accuracy claims are fabricated.
+8. **Missing or unavailable data is not fabricated** — empty states are displayed with meaningful messages.
+9. **CPI airfare-specific component weights are not officially published in usable form** — prototype weights are used and clearly labelled.
 
 ---
 
