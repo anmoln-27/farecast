@@ -6,8 +6,6 @@ export default function IndexSection({ indexData, selectedRoute, selectedDate })
 
   // Match specific route if filtered, otherwise find national AGGREGATE
   let activeRecord = null;
-  let isNearestPeriod = false;
-  let isFallbackAggregate = false;
 
   const routeRecords = selectedRoute
     ? records.filter((r) => r.route === selectedRoute)
@@ -17,7 +15,6 @@ export default function IndexSection({ indexData, selectedRoute, selectedDate })
   if (pool.length === 0) {
     // If route-specific index is missing, fallback to AGGREGATE
     pool = records.filter((r) => r.route === 'AGGREGATE');
-    isFallbackAggregate = true;
   }
   if (pool.length === 0) {
     pool = records;
@@ -32,17 +29,14 @@ export default function IndexSection({ indexData, selectedRoute, selectedDate })
       activeRecord = exactMatch;
     } else {
       activeRecord = pool[0];
-      isNearestPeriod = true;
     }
   } else {
     activeRecord = pool[0] || null;
   }
 
   const indexValue = activeRecord?.index_value;
-  const baselineFare = activeRecord?.baseline_fare;
   const period = activeRecord?.period || 'Latest Period';
-  const baselinePeriod = activeRecord?.baseline_period || '2022-02';
-  const displayRoute = activeRecord?.route || selectedRoute || 'National Aggregate';
+  const displayRoute = selectedRoute || activeRecord?.route || 'National Aggregate';
 
   // Calculate change vs baseline (base is 100)
   const changeVsBaseline = indexValue != null ? indexValue - 100 : null;
@@ -52,26 +46,11 @@ export default function IndexSection({ indexData, selectedRoute, selectedDate })
       <div className="index-details">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
           <span className="prototype-tag">AIRFARE PRICE INDEX</span>
-          {isNearestPeriod && (
-            <span style={{ fontSize: '11px', background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
-              Nearest Available Period
-            </span>
-          )}
-          {isFallbackAggregate && (
-            <span style={{ fontSize: '11px', background: '#E0E7FF', color: '#3730A3', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
-              National Aggregate Baseline
-            </span>
-          )}
         </div>
         <h2 className="index-title serif-heading">
-          {selectedRoute && !isFallbackAggregate ? `Route Price Index: ${selectedRoute}` : `National Airfare Price Index (${displayRoute})`}
+          {selectedRoute ? `Route Price Index: ${selectedRoute}` : `Airfare Price Index: ${displayRoute}`}
         </h2>
         <p className="index-disclaimer">
-          {isFallbackAggregate
-            ? "Route-specific index unavailable. Showing documented national aggregate index as baseline. "
-            : isNearestPeriod
-            ? "Using available observations — no records for the exact selected date. "
-            : ""}
           Experimental airfare benchmark with Base Period = 100.
           <strong> Not an official Government of India statistical publication.</strong>
         </p>

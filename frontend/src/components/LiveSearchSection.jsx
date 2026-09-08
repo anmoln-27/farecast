@@ -52,7 +52,7 @@ export default function LiveSearchSection({ liveStatus }) {
         </div>
         <div className={`status-indicator ${isLive ? 'live' : 'demo'}`}>
           <span className="status-dot"></span>
-          <span>{isLive ? `LIVE (${providerName})` : 'HISTORICAL / DEMO FALLBACK'}</span>
+          <span>{isLive ? `LIVE (${providerName})` : 'DEMO MODE'}</span>
         </div>
       </div>
 
