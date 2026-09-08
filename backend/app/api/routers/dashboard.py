@@ -5,9 +5,13 @@ GET /api/dashboard/summary — combined summary for dashboard views.
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends
-from sqlalchemy import distinct
+from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from backend.app.api.deps import get_db, get_settings
 from backend.app.core.config import Settings
@@ -32,9 +36,23 @@ def dashboard_summary(
         fare_count = db.query(FareObservation).count()
         modes = db.query(distinct(FareObservation.data_mode)).all()
         data_modes = [m[0].value if hasattr(m[0], "value") else str(m[0]) for m in modes]
+
+        # Compute full-dataset fare aggregates (not paginated)
+        fare_agg = db.query(
+            func.avg(FareObservation.fare),
+            func.min(FareObservation.fare),
+            func.max(FareObservation.fare),
+        ).one()
+        avg_fare = float(fare_agg[0]) if fare_agg[0] is not None else None
+        min_fare = float(fare_agg[1]) if fare_agg[1] is not None else None
+        max_fare = float(fare_agg[2]) if fare_agg[2] is not None else None
     except Exception as exc:
+        logger.error("Dashboard summary error: %s", exc)
         fare_count = 0
         data_modes = ["HISTORICAL"]
+        avg_fare = None
+        min_fare = None
+        max_fare = None
 
     route_count = db.query(Route).count()
     airline_count = db.query(Airline).count()
@@ -57,6 +75,9 @@ def dashboard_summary(
         ),
         ignav_configured=settings.ignav_available,
         data_modes_present=data_modes,
+        avg_fare=avg_fare,
+        min_fare=min_fare,
+        max_fare=max_fare,
     )
 
 

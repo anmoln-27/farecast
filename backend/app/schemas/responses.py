@@ -305,6 +305,10 @@ class DashboardSummary(BaseModel):
     amadeus_configured: bool
     ignav_configured: bool = False
     data_modes_present: List[str]
+    # Aggregate fare statistics across ALL observations (full dataset, not paginated)
+    avg_fare: Optional[float] = None
+    min_fare: Optional[float] = None
+    max_fare: Optional[float] = None
     disclaimer: str = (
         "FARECAST — Airfare Intelligence India. "
         "Prototype index values are NOT official Government of India statistics."

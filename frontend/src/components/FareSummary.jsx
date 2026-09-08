@@ -2,21 +2,26 @@ import React from 'react';
 import { formatINR, formatNumber } from '../utils/formatters';
 
 export default function FareSummary({ faresData, summaryMeta }) {
-  // Compute from faresData if available
-  const records = faresData?.data || [];
-  
-  let avgFare = null;
-  let minFare = null;
-  let maxFare = null;
-  let totalObservations = summaryMeta?.total_fare_observations || 0;
+  // ── Primary: use pre-aggregated stats from the backend dashboard summary ──
+  // These cover the FULL dataset (not a paginated 100-record subset).
+  const totalObservations = summaryMeta?.total_fare_observations ?? (faresData?.meta?.total ?? 0);
 
-  if (records.length > 0) {
-    const fares = records.map((r) => r.fare).filter((f) => f !== null && !isNaN(f));
-    if (fares.length > 0) {
-      avgFare = fares.reduce((a, b) => a + b, 0) / fares.length;
-      minFare = Math.min(...fares);
-      maxFare = Math.max(...fares);
-      totalObservations = faresData.meta?.total || records.length;
+  // Backend now returns avg_fare, min_fare, max_fare computed via SQL over all rows.
+  // Fall back to computing from the local faresData page only if summaryMeta aggregates are absent.
+  let avgFare = (summaryMeta?.avg_fare != null) ? summaryMeta.avg_fare : null;
+  let minFare = (summaryMeta?.min_fare != null) ? summaryMeta.min_fare : null;
+  let maxFare = (summaryMeta?.max_fare != null) ? summaryMeta.max_fare : null;
+
+  if (avgFare === null || minFare === null || maxFare === null) {
+    // Fallback: compute from paginated records (partial dataset)
+    const records = faresData?.data || [];
+    if (records.length > 0) {
+      const fares = records.map((r) => Number(r.fare)).filter((f) => !isNaN(f) && f > 0);
+      if (fares.length > 0) {
+        if (avgFare === null) avgFare = fares.reduce((a, b) => a + b, 0) / fares.length;
+        if (minFare === null) minFare = Math.min(...fares);
+        if (maxFare === null) maxFare = Math.max(...fares);
+      }
     }
   }
 
@@ -28,7 +33,7 @@ export default function FareSummary({ faresData, summaryMeta }) {
           {formatINR(avgFare)}
         </div>
         <div className="summary-delta">
-          Across {formatNumber(totalObservations)} filtered records
+          Across {formatNumber(totalObservations)} historical records
         </div>
       </div>
 

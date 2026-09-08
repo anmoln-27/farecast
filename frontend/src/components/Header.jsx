@@ -1,13 +1,16 @@
 import React from 'react';
 
 export default function Header({ liveStatus, activeTab, onTabChange }) {
-  // Mode label handling from /api/live/status
-  const modeLabel = liveStatus?.mode_label || (liveStatus?.demo_mode ? 'DEMO' : 'HISTORICAL');
-  
+  // On the 'live' tab: show live provider status (LIVE/DEMO).
+  // On all other tabs: always show HISTORICAL — the dashboard displays historical observations,
+  // regardless of whether a live provider (Ignav) is configured on the server.
+  const liveModeLabel = liveStatus?.mode_label || (liveStatus?.demo_mode ? 'DEMO' : 'HISTORICAL');
+  const modeLabel = activeTab === 'live' ? liveModeLabel : 'HISTORICAL';
+
   let statusClass = 'historical';
-  if (modeLabel.includes('LIVE')) {
+  if (activeTab === 'live' && modeLabel.includes('LIVE')) {
     statusClass = 'live';
-  } else if (modeLabel.includes('DEMO')) {
+  } else if (activeTab === 'live' && modeLabel.includes('DEMO')) {
     statusClass = 'demo';
   }
 
