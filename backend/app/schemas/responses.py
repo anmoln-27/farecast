@@ -21,6 +21,7 @@ class HealthResponse(BaseModel):
     version: str = "4.0"
     demo_mode: bool
     amadeus_configured: bool
+    ignav_configured: bool = False
 
 
 class PaginationMeta(BaseModel):
@@ -250,19 +251,20 @@ class CPIResponse(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class LiveFareOffer(BaseModel):
-    source: str = "AMADEUS"
+    source: str = "IGNAV"
     data_mode: str = "LIVE"
     origin: str
     destination: str
     airline_code: Optional[str] = None
     airline_name: Optional[str] = None
+    flight_number: Optional[str] = None
     departure_datetime: Optional[str] = None
     arrival_datetime: Optional[str] = None
     duration_minutes: Optional[int] = None
     stops: int = 0
     cabin_class: str = "Economy"
     fare: float
-    currency: str = "EUR"
+    currency: str = "INR"
     fare_inr_estimate: Optional[float] = None
     collected_at: datetime
     segments: Optional[List[Dict[str, Any]]] = None
@@ -280,6 +282,8 @@ class LiveSearchResponse(BaseModel):
 class LiveStatusResponse(BaseModel):
     demo_mode: bool
     amadeus_configured: bool
+    ignav_configured: bool = False
+    active_provider: str = "DEMO"
     amadeus_reachable: Optional[bool] = None
     mode_label: str
     message: str
@@ -299,6 +303,7 @@ class DashboardSummary(BaseModel):
     total_cpi_records: int
     demo_mode: bool
     amadeus_configured: bool
+    ignav_configured: bool = False
     data_modes_present: List[str]
     disclaimer: str = (
         "FARECAST — Airfare Intelligence India. "

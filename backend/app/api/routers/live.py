@@ -32,6 +32,13 @@ from backend.app.services.amadeus_service import (
     AmadeusService,
     get_amadeus_service,
 )
+from backend.app.services.ignav_service import (
+    IgnavAuthError,
+    IgnavConfigError,
+    IgnavSearchError,
+    IgnavService,
+    get_ignav_service,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/live", tags=["Live"])
@@ -43,62 +50,73 @@ _AMADEUS_DISCLAIMER = (
     "This is NOT a booking system."
 )
 
+_IGNAV_DISCLAIMER = (
+    "Ignav Live Airfare API results. "
+    "Real-time one-way flight search with Indian domestic market coverage. "
+    "This is NOT a booking system."
+)
+
 _DEMO_DISCLAIMER = (
     "DEMO mode: returning HISTORICAL data from the local database. "
-    "No live Amadeus API call was made."
+    "No live API call was made."
 )
 
 
 # ─── /api/live/status ─────────────────────────────────────────────────────────
 
-@router.get("/status", response_model=LiveStatusResponse, summary="Amadeus live status")
+@router.get("/status", response_model=LiveStatusResponse, summary="Live status")
 def live_status(settings: Settings = Depends(get_settings)) -> LiveStatusResponse:
     """
-    Return configuration and connectivity status for the live Amadeus integration.
-    NEVER returns credentials.
+    Return configuration and connectivity status for live integrations (Ignav / Amadeus).
+    NEVER returns credentials or secrets.
     """
+    ignav_configured = bool(settings.ignav_available)
     amadeus_configured = bool(
         settings.AMADEUS_CLIENT_ID and settings.AMADEUS_CLIENT_SECRET
     )
 
-    if settings.DEMO_MODE:
+    # 1. Ignav configured (Primary live provider)
+    if ignav_configured:
         return LiveStatusResponse(
-            demo_mode=True,
+            demo_mode=settings.DEMO_MODE,
             amadeus_configured=amadeus_configured,
+            ignav_configured=True,
+            active_provider="IGNAV",
             amadeus_reachable=None,
-            mode_label="DEMO",
-            message=(
-                "Application is running in DEMO mode. "
-                "Set DEMO_MODE=false and supply Amadeus credentials to enable live search."
-            ),
+            mode_label="LIVE (Ignav)",
+            message="Ignav live airfare provider configured and active.",
         )
 
-    if not amadeus_configured:
+    # 2. Amadeus configured and DEMO_MODE off (Secondary / enterprise provider)
+    if settings.amadeus_available:
+        svc = get_amadeus_service(settings)
+        reachable = svc.check_connectivity()
         return LiveStatusResponse(
             demo_mode=False,
-            amadeus_configured=False,
-            amadeus_reachable=None,
-            mode_label="DEMO (missing credentials)",
+            amadeus_configured=True,
+            ignav_configured=False,
+            active_provider="AMADEUS",
+            amadeus_reachable=reachable,
+            mode_label="LIVE (Amadeus)" if reachable else "LIVE (Amadeus unreachable)",
             message=(
-                "Amadeus credentials are not configured. "
-                "Set AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET environment variables."
+                "Amadeus configured and reachable. Live search is active."
+                if reachable
+                else "Amadeus configured but connectivity check failed."
             ),
         )
 
-    # Check connectivity without exposing credentials in response
-    svc = get_amadeus_service(settings)
-    reachable = svc.check_connectivity()
-
+    # 3. DEMO fallback
+    mode_label = "DEMO" if settings.DEMO_MODE else "DEMO (missing credentials)"
     return LiveStatusResponse(
-        demo_mode=False,
-        amadeus_configured=True,
-        amadeus_reachable=reachable,
-        mode_label="LIVE" if reachable else "LIVE (unreachable)",
+        demo_mode=settings.DEMO_MODE,
+        amadeus_configured=amadeus_configured,
+        ignav_configured=False,
+        active_provider="DEMO",
+        amadeus_reachable=None,
+        mode_label=mode_label,
         message=(
-            "Amadeus configured and reachable. Live search is active."
-            if reachable
-            else "Amadeus configured but connectivity check failed. "
-                 "Check network or API status."
+            "Application is running in DEMO mode. "
+            "Supply IGNAV_API_KEY to enable real live airfare search."
         ),
     )
 
@@ -118,15 +136,17 @@ def live_search(
     db: Session = Depends(get_db),
 ) -> LiveSearchResponse:
     """
-    Search for live airfares via Amadeus Flight Offers Search.
+    Search for live airfares via Ignav (primary) or Amadeus (secondary).
 
-    - When DEMO_MODE=true or credentials are missing: returns clearly labelled
-      HISTORICAL data from the local database.
-    - When live: returns Amadeus results labelled LIVE.
+    Provider Selection Hierarchy:
+    1. If IGNAV_API_KEY is configured -> Query Ignav Live API (market=IN).
+       If Ignav error/unavailable -> safe DEMO fallback (clearly labelled DEMO/HISTORICAL).
+    2. Else if Amadeus is configured and DEMO_MODE is false -> Query Amadeus Live.
+    3. Else -> safe DEMO fallback.
+
     - NEVER fabricates live data.
-    - NEVER exposes API credentials.
-
-    Coverage note: Amadeus does not cover every Indian domestic airline.
+    - NEVER exposes API credentials in logs or responses.
+    - NEVER labels fallback/synthetic data as LIVE.
     """
     # Validate departure_date format
     try:
@@ -137,56 +157,88 @@ def live_search(
             detail="departure_date must be ISO format: YYYY-MM-DD",
         )
 
-    # DEMO / fallback path
-    if not settings.amadeus_available:
-        return _demo_fallback(origin, destination, db, settings)
+    # ── 1. Ignav Provider (Primary) ───────────────────────────────────────────
+    if settings.ignav_available:
+        svc = get_ignav_service(settings)
+        try:
+            raw_offers = svc.search_flights(
+                origin=origin,
+                destination=destination,
+                departure_date=departure_date,
+                adults=adults,
+                travel_class=travel_class,
+                max_results=max_results,
+                market="IN",
+            )
+            offers = [LiveFareOffer(**o) for o in raw_offers]
+            persisted_count = 0
+            if persist and offers:
+                persisted_count = _persist_live_offers(db, offers, departure_date, source="ignav")
 
-    # Live path
-    svc = get_amadeus_service(settings)
-    try:
-        raw_offers = svc.search_flights(
-            origin=origin,
-            destination=destination,
-            departure_date=departure_date,
-            adults=adults,
-            travel_class=travel_class,
-            max_results=max_results,
-        )
-    except AmadeusAuthError as exc:
-        logger.error("Amadeus auth error during search: %s", type(exc).__name__)
-        raise HTTPException(
-            status_code=502,
-            detail="Amadeus authentication failed. Check credentials configuration.",
-        )
-    except AmadeusSearchError as exc:
-        logger.error("Amadeus search error: %s", type(exc).__name__)
-        raise HTTPException(
-            status_code=502,
-            detail="Amadeus flight search failed. Try again or switch to DEMO mode.",
+            return LiveSearchResponse(
+                data_mode="LIVE",
+                source="IGNAV",
+                disclaimer=_IGNAV_DISCLAIMER,
+                offers=offers,
+                total=len(offers),
+                persisted_count=persisted_count,
+            )
+        except Exception as exc:
+            # Fall back to DEMO mode if Ignav request fails, without claiming to be LIVE
+            logger.error("Ignav live search failed (%s), safely falling back to DEMO", type(exc).__name__)
+            return _demo_fallback(origin, destination, db, settings)
+
+    # ── 2. Amadeus Provider (Alternative/Future) ──────────────────────────────
+    if settings.amadeus_available:
+        svc = get_amadeus_service(settings)
+        try:
+            raw_offers = svc.search_flights(
+                origin=origin,
+                destination=destination,
+                departure_date=departure_date,
+                adults=adults,
+                travel_class=travel_class,
+                max_results=max_results,
+            )
+        except AmadeusAuthError as exc:
+            logger.error("Amadeus auth error during search: %s", type(exc).__name__)
+            raise HTTPException(
+                status_code=502,
+                detail="Amadeus authentication failed. Check credentials configuration.",
+            )
+        except AmadeusSearchError as exc:
+            logger.error("Amadeus search error: %s", type(exc).__name__)
+            raise HTTPException(
+                status_code=502,
+                detail="Amadeus flight search failed. Try again or switch to DEMO mode.",
+            )
+
+        offers = [LiveFareOffer(**o) for o in raw_offers]
+        persisted_count = 0
+        if persist and offers:
+            persisted_count = _persist_live_offers(db, offers, departure_date, source="amadeus")
+
+        return LiveSearchResponse(
+            data_mode="LIVE",
+            source="AMADEUS",
+            disclaimer=_AMADEUS_DISCLAIMER,
+            offers=offers,
+            total=len(offers),
+            persisted_count=persisted_count,
         )
 
-    offers = [LiveFareOffer(**o) for o in raw_offers]
-    persisted_count = 0
-    if persist and offers:
-        persisted_count = _persist_live_offers(db, offers, departure_date)
-
-    return LiveSearchResponse(
-        data_mode="LIVE",
-        source="AMADEUS",
-        disclaimer=_AMADEUS_DISCLAIMER,
-        offers=offers,
-        total=len(offers),
-        persisted_count=persisted_count,
-    )
+    # ── 3. DEMO / Fallback Path ───────────────────────────────────────────────
+    return _demo_fallback(origin, destination, db, settings)
 
 
 def _persist_live_offers(
     db: Session,
     offers: list[LiveFareOffer],
     departure_date_str: str,
+    source: str = "amadeus",
 ) -> int:
     """
-    Persist verified live Amadeus offers to fare_observations table under DataMode.LIVE.
+    Persist verified live offers to fare_observations table under DataMode.LIVE.
     Ensures airline existence and maps advance purchase windows.
     """
     from backend.app.db.models import Airline, CabinClass, DataMode
@@ -223,7 +275,8 @@ def _persist_live_offers(
             code = (o.airline_code or "6E").upper()
             existing_airline = db.query(Airline).filter_by(code=code).first()
             if not existing_airline:
-                db.add(Airline(code=code, name=code, country="India"))
+                airline_label = o.airline_name or code
+                db.add(Airline(code=code, name=airline_label, country="India"))
                 db.flush()
 
             cabin_enum = cabin_map.get(o.cabin_class.lower(), CabinClass.ECONOMY)
@@ -239,9 +292,10 @@ def _persist_live_offers(
                 arr_time = o.arrival_datetime[11:16]
 
             obs = FareObservation(
-                source="amadeus",
+                source=source.lower(),
                 data_mode=DataMode.LIVE,
                 airline_code=code,
+                flight_number=o.flight_number,
                 origin=o.origin.upper(),
                 destination=o.destination.upper(),
                 travel_date=travel_dt,
@@ -253,6 +307,10 @@ def _persist_live_offers(
                 cabin_class=cabin_enum,
                 fare=fare_val,
                 currency=curr,
+                base_fare=None,
+                taxes=None,
+                udf_charge=None,
+                convenience_fee=None,
                 total_fare=fare_val,
                 advance_window=adv_win,
                 days_left=days_left,
@@ -267,7 +325,7 @@ def _persist_live_offers(
     if persisted > 0:
         try:
             db.commit()
-            logger.info("Persisted %d LIVE airfare observations from Amadeus.", persisted)
+            logger.info("Persisted %d LIVE airfare observations from %s.", persisted, source)
         except Exception as exc:
             db.rollback()
             logger.error("DB rollback on persisting live offers: %s", exc)

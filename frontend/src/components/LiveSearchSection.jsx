@@ -37,19 +37,20 @@ export default function LiveSearchSection({ liveStatus }) {
     }
   };
 
-  const mode = results?.data_mode || (liveStatus?.demo_mode ? 'DEMO' : 'HISTORICAL');
-  const isLive = mode === 'LIVE';
+  const mode = results?.data_mode || (liveStatus?.active_provider === 'IGNAV' ? 'LIVE' : (liveStatus?.demo_mode ? 'DEMO' : 'HISTORICAL'));
+  const isLive = results ? results.data_mode === 'LIVE' : (liveStatus?.active_provider === 'IGNAV' || liveStatus?.mode_label?.includes('LIVE'));
+  const providerName = results?.source || (liveStatus?.active_provider === 'IGNAV' ? 'IGNAV' : (liveStatus?.amadeus_configured ? 'AMADEUS' : 'LIVE'));
 
   return (
     <div className="panel full-width" id="section-live-search">
       <div className="panel-header">
         <div className="panel-title-group">
-          <span className="panel-title">LIVE AIRFARE SEARCH (AMADEUS API)</span>
-          <span className="panel-subtitle">Global Distribution System live query with automated DEMO historical fallback</span>
+          <span className="panel-title">LIVE AIRFARE SEARCH ({providerName} API)</span>
+          <span className="panel-subtitle">Real-time live flight search with automated DEMO historical fallback</span>
         </div>
         <div className={`status-indicator ${isLive ? 'live' : 'demo'}`}>
           <span className="status-dot"></span>
-          <span>{isLive ? 'LIVE AMADEUS' : 'DEMO MODE FALLBACK'}</span>
+          <span>{isLive ? `LIVE ${providerName}` : 'DEMO MODE FALLBACK'}</span>
         </div>
       </div>
 
@@ -173,7 +174,7 @@ export default function LiveSearchSection({ liveStatus }) {
             {results.offers.length === 0 ? (
               <EmptyState
                 title="No flight offers returned"
-                message="Amadeus returned zero offers for this specific date and route. Note that GDS inventory may not cover low-cost Indian domestic carriers."
+                message="The live flight search provider returned zero offers for this specific date and route."
               />
             ) : (
               <div className="data-table-wrapper">
@@ -181,11 +182,12 @@ export default function LiveSearchSection({ liveStatus }) {
                   <thead>
                     <tr>
                       <th>Carrier</th>
+                      <th>Flight</th>
                       <th>Route</th>
                       <th>Departure</th>
                       <th>Stops</th>
                       <th>Class</th>
-                      <th>Fare ({isLive ? 'EUR' : 'INR'})</th>
+                      <th>Fare ({results?.offers?.[0]?.currency || 'INR'})</th>
                       <th>INR Estimate</th>
                     </tr>
                   </thead>
@@ -194,6 +196,9 @@ export default function LiveSearchSection({ liveStatus }) {
                       <tr key={idx}>
                         <td style={{ fontWeight: 600 }}>
                           {offer.airline_name || offer.airline_code || 'Airline'}
+                        </td>
+                        <td className="mono-num" style={{ fontSize: '12px' }}>
+                          {offer.flight_number || '-'}
                         </td>
                         <td>{offer.origin} &rarr; {offer.destination}</td>
                         <td className="mono-num" style={{ fontSize: '12px' }}>

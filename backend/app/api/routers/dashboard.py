@@ -54,5 +54,6 @@ def dashboard_summary(
         amadeus_configured=bool(
             settings.AMADEUS_CLIENT_ID and settings.AMADEUS_CLIENT_SECRET
         ),
+        ignav_configured=settings.ignav_available,
         data_modes_present=data_modes,
     )

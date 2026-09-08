@@ -59,6 +59,16 @@ class Settings(BaseSettings):
             and self.AMADEUS_CLIENT_SECRET
         )
 
+    # ── Ignav Live Provider ───────────────────────────────────────────────────
+    IGNAV_API_KEY: str = ""
+    IGNAV_BASE_URL: str = "https://ignav.com"
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def ignav_available(self) -> bool:
+        """True when IGNAV_API_KEY is present in the environment."""
+        return bool(self.IGNAV_API_KEY and self.IGNAV_API_KEY.strip())
+
     # ── CORS ──────────────────────────────────────────────────────────────────
     FRONTEND_URL: str = "http://localhost:3000"
 

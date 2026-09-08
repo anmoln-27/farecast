@@ -458,33 +458,44 @@ npm run build
 
 ---
 
-## 13. Demo Mode
+## 13. Demo Mode & Live Provider Architecture
 
 Set `DEMO_MODE=true` in `.env` (this is the default).
 
 In demo mode:
-- Historical data is used for all queries.
-- Amadeus API is not called.
-- Results are clearly labelled as `DEMO` or `HISTORICAL`.
+- Historical data from the local database is used for queries.
+- Live APIs (Ignav / Amadeus) are not called unless configured.
+- Results are strictly and visibly labelled as `DEMO` or `HISTORICAL`.
+- DEMO mode is NEVER labelled as LIVE data.
 - The application is fully functional without any API credentials.
-
-**Judges can run the complete application without Amadeus credentials.**
 
 ---
 
-## 14. Amadeus API Setup
+## 14. Live Airfare Providers
 
+### Primary Provider: Ignav API
+FareCast integrates **Ignav** (`https://ignav.com`) as its primary real-time airfare data provider for Indian domestic routes (DEL, BOM, BLR, etc.).
+- Configured via server-side environment variables:
+  ```bash
+  IGNAV_API_KEY=your_key_here
+  IGNAV_BASE_URL=https://ignav.com
+  ```
+- **Token & Cost Protection:** Live searches are user-triggered only. Automated polling or background daemons that consume free allowance are intentionally disabled.
+- When `IGNAV_API_KEY` is present, `/api/live/search` executes real live queries and tags results as `source="IGNAV"`, `data_mode="LIVE"`.
+- If Ignav is unavailable or encounters network issues, FareCast safely falls back to DEMO historical mode without pretending to be live.
+
+### Alternative Provider: Amadeus API
+Amadeus remains supported as an enterprise alternative provider:
 1. Register at https://developers.amadeus.com/
-2. Create an application and obtain `Client ID` and `Client Secret`.
-3. Add to `.env`:
-   ```
+2. Add credentials to `.env`:
+   ```bash
    AMADEUS_CLIENT_ID=your_client_id
    AMADEUS_CLIENT_SECRET=your_client_secret
    AMADEUS_HOSTNAME=test
    ```
-4. Set `DEMO_MODE=false` in `.env`.
+3. When Ignav is not configured and Amadeus is enabled (`DEMO_MODE=false`), FareCast queries Amadeus.
 
-**Credentials are NEVER committed to version control.**
+**Credentials are NEVER committed to version control, logged, or exposed in API responses.**
 
 ---
 

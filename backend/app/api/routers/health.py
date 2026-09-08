@@ -24,4 +24,5 @@ def health(settings: Settings = Depends(get_settings)) -> HealthResponse:
         version="4.0",
         demo_mode=settings.DEMO_MODE,
         amadeus_configured=bool(settings.AMADEUS_CLIENT_ID and settings.AMADEUS_CLIENT_SECRET),
+        ignav_configured=settings.ignav_available,
     )

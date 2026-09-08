@@ -84,8 +84,9 @@ def create_app() -> FastAPI:
     app.include_router(scrapers.router)
 
     logger.info(
-        "FARECAST API started | DEMO_MODE=%s | Amadeus=%s",
+        "FARECAST API started | DEMO_MODE=%s | Ignav=%s | Amadeus=%s",
         settings.DEMO_MODE,
+        "configured" if settings.ignav_available else "not configured",
         "configured" if (settings.AMADEUS_CLIENT_ID and settings.AMADEUS_CLIENT_SECRET) else "not configured",
     )
 

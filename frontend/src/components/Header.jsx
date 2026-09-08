@@ -18,7 +18,7 @@ export default function Header({ liveStatus, activeTab, onTabChange }) {
     { id: 'forecast', label: 'Fare Forecast' },
     { id: 'signals', label: 'Market Signals' },
     { id: 'context', label: 'DGCA & MoSPI Context' },
-    { id: 'live', label: 'Live Amadeus Search' },
+    { id: 'live', label: 'Live Flight Search' },
   ];
 
   return (
