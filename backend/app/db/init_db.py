@@ -8,8 +8,7 @@ Run once before the application starts, or via:
 from __future__ import annotations
 
 import logging
-
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from backend.app.db.base import Base, engine
 from backend.app.db.models import Airline, CPIReference  # noqa: F401 — imported for metadata
@@ -30,10 +29,6 @@ SEED_AIRLINES = [
 ]
 
 # ── MoSPI / CPI reference seed data ─────────────────────────────────────────
-# Source: MoSPI — CPI (Combined) base year 2012=100
-# Transport & Communication is the closest published CPI group to air travel.
-# These values are illustrative reference points from publicly available
-# CPI press notes; they must NOT be used as airfare observations.
 SEED_CPI = [
     {
         "indicator": "CPI (Rural+Urban) - Transport & Communication",
@@ -67,47 +62,99 @@ SEED_CPI = [
 
 
 def migrate_columns() -> None:
-    """Safely add any newly introduced columns to existing SQLite tables."""
+    """
+    Safely inspect and add any missing columns across SQLite AND PostgreSQL.
+    Dialect-agnostic: uses sqlalchemy.inspect() instead of SQLite-only PRAGMAs.
+    Never drops data or tables.
+    """
     eng = engine()
     with eng.connect() as conn:
-        # Check fare_observations columns
-        try:
-            res = conn.execute(text("PRAGMA table_info(fare_observations)")).fetchall()
-            existing_cols = {row[1] for row in res}
-            new_cols = [
-                ("base_fare", "FLOAT"),
-                ("taxes", "FLOAT"),
-                ("udf_charge", "FLOAT"),
-                ("convenience_fee", "FLOAT"),
-                ("total_fare", "FLOAT"),
-                ("advance_window", "VARCHAR(10)"),
-                ("status", "VARCHAR(20) DEFAULT 'AVAILABLE'"),
-            ]
-            for col_name, col_type in new_cols:
-                if col_name not in existing_cols:
-                    conn.execute(text(f"ALTER TABLE fare_observations ADD COLUMN {col_name} {col_type}"))
-                    logger.info(f"Added column {col_name} to fare_observations.")
-            conn.commit()
-        except Exception as exc:
-            logger.warning(f"Migration for fare_observations: {exc}")
+        inspector = inspect(conn)
+        tables = inspector.get_table_names()
 
-        # Check airfare_index columns
-        try:
-            res = conn.execute(text("PRAGMA table_info(airfare_index)")).fetchall()
-            existing_cols = {row[1] for row in res}
-            new_cols = [
-                ("frequency", "VARCHAR(10) DEFAULT 'monthly'"),
-                ("index_formula", "VARCHAR(30) DEFAULT 'Laspeyres'"),
-                ("sub_index", "VARCHAR(20) DEFAULT 'COMPOSITE'"),
-                ("dgca_weight", "FLOAT"),
-            ]
-            for col_name, col_type in new_cols:
-                if col_name not in existing_cols:
-                    conn.execute(text(f"ALTER TABLE airfare_index ADD COLUMN {col_name} {col_type}"))
-                    logger.info(f"Added column {col_name} to airfare_index.")
-            conn.commit()
-        except Exception as exc:
-            logger.warning(f"Migration for airfare_index: {exc}")
+        # 1. fare_observations columns
+        if "fare_observations" in tables:
+            try:
+                existing_cols = {col["name"] for col in inspector.get_columns("fare_observations")}
+                fare_cols = [
+                    ("flight_number", "VARCHAR(20)"),
+                    ("booking_date", "DATE"),
+                    ("departure_time", "VARCHAR(20)"),
+                    ("arrival_time", "VARCHAR(20)"),
+                    ("stops", "INTEGER DEFAULT 0"),
+                    ("duration_minutes", "INTEGER"),
+                    ("base_fare", "FLOAT"),
+                    ("taxes", "FLOAT"),
+                    ("udf_charge", "FLOAT"),
+                    ("convenience_fee", "FLOAT"),
+                    ("total_fare", "FLOAT"),
+                    ("advance_window", "VARCHAR(10)"),
+                    ("status", "VARCHAR(20) DEFAULT 'AVAILABLE'"),
+                    ("days_left", "INTEGER"),
+                    ("collected_at", "TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP" if conn.dialect.name == "postgresql" else "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+                    ("created_at", "TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP" if conn.dialect.name == "postgresql" else "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+                ]
+                for col_name, col_type in fare_cols:
+                    if col_name not in existing_cols:
+                        try:
+                            conn.execute(text(f"ALTER TABLE fare_observations ADD COLUMN {col_name} {col_type}"))
+                            conn.commit()
+                            logger.info("Added missing column %s to fare_observations.", col_name)
+                        except Exception as exc:
+                            logger.warning("Could not add column %s to fare_observations: %s", col_name, exc)
+                            conn.rollback()
+            except Exception as exc:
+                logger.warning("Failed inspecting fare_observations columns: %s", exc)
+
+        # 2. airfare_index columns
+        if "airfare_index" in tables:
+            try:
+                existing_cols = {col["name"] for col in inspector.get_columns("airfare_index")}
+                index_cols = [
+                    ("frequency", "VARCHAR(10) DEFAULT 'monthly'"),
+                    ("index_formula", "VARCHAR(30) DEFAULT 'Laspeyres'"),
+                    ("sub_index", "VARCHAR(20) DEFAULT 'COMPOSITE'"),
+                    ("dgca_weight", "FLOAT"),
+                ]
+                for col_name, col_type in index_cols:
+                    if col_name not in existing_cols:
+                        try:
+                            conn.execute(text(f"ALTER TABLE airfare_index ADD COLUMN {col_name} {col_type}"))
+                            conn.commit()
+                            logger.info("Added missing column %s to airfare_index.", col_name)
+                        except Exception as exc:
+                            logger.warning("Could not add column %s to airfare_index: %s", col_name, exc)
+                            conn.rollback()
+            except Exception as exc:
+                logger.warning("Failed inspecting airfare_index columns: %s", exc)
+
+        # 3. PostgreSQL ENUM values safety
+        if conn.dialect.name == "postgresql":
+            try:
+                conn.execute(text("""
+                DO $$ BEGIN
+                    ALTER TYPE datamode ADD VALUE IF NOT EXISTS 'LIVE';
+                EXCEPTION
+                    WHEN duplicate_object THEN null;
+                    WHEN undefined_object THEN null;
+                END $$;
+                DO $$ BEGIN
+                    ALTER TYPE datamode ADD VALUE IF NOT EXISTS 'HISTORICAL';
+                EXCEPTION
+                    WHEN duplicate_object THEN null;
+                    WHEN undefined_object THEN null;
+                END $$;
+                DO $$ BEGIN
+                    ALTER TYPE datamode ADD VALUE IF NOT EXISTS 'DEMO';
+                EXCEPTION
+                    WHEN duplicate_object THEN null;
+                    WHEN undefined_object THEN null;
+                END $$;
+                """))
+                conn.commit()
+            except Exception as exc:
+                logger.warning("PostgreSQL enum check: %s", exc)
+                conn.rollback()
 
 
 def create_tables() -> None:

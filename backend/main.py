@@ -83,6 +83,16 @@ def create_app() -> FastAPI:
     app.include_router(nso_rbi.router)
     app.include_router(scrapers.router)
 
+    @app.on_event("startup")
+    def on_startup():
+        """Ensure database schema is up to date and all required columns exist."""
+        try:
+            from backend.app.db.init_db import create_tables
+            create_tables()
+            logger.info("Startup database tables & columns verified.")
+        except Exception as exc:
+            logger.warning("Startup database check warning: %s", exc)
+
     logger.info(
         "FARECAST API started | DEMO_MODE=%s | Ignav=%s | Amadeus=%s",
         settings.DEMO_MODE,

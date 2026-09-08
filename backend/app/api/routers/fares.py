@@ -5,16 +5,19 @@ GET /api/fares — query historical fare observations.
 """
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import String, cast
 from sqlalchemy.orm import Session
 
 from backend.app.api.deps import get_db
 from backend.app.db.models import FareObservation
 from backend.app.schemas.responses import FaresResponse, FareRecord, PaginationMeta
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Fares"])
 
 
@@ -36,32 +39,39 @@ def list_fares(
     Query historical and live airfare observations stored in the database.
     Supports filtering by route, airline, cabin class, advance window, data mode, and date range.
     """
-    q = db.query(FareObservation)
+    try:
+        q = db.query(FareObservation)
 
-    if origin:
-        q = q.filter(FareObservation.origin == origin.upper())
-    if destination:
-        q = q.filter(FareObservation.destination == destination.upper())
-    if airline:
-        q = q.filter(FareObservation.airline_code == airline.upper())
-    if cabin_class:
-        q = q.filter(FareObservation.cabin_class.ilike(cabin_class))
-    if advance_window:
-        q = q.filter(FareObservation.advance_window == advance_window.upper())
-    if data_mode:
-        q = q.filter(FareObservation.data_mode == data_mode.upper())
-    if travel_date_from:
-        q = q.filter(FareObservation.travel_date >= travel_date_from)
-    if travel_date_to:
-        q = q.filter(FareObservation.travel_date <= travel_date_to)
+        if origin:
+            q = q.filter(FareObservation.origin == origin.upper())
+        if destination:
+            q = q.filter(FareObservation.destination == destination.upper())
+        if airline:
+            q = q.filter(FareObservation.airline_code == airline.upper())
+        if cabin_class:
+            q = q.filter(cast(FareObservation.cabin_class, String).ilike(f"%{cabin_class}%"))
+        if advance_window:
+            q = q.filter(FareObservation.advance_window == advance_window.upper())
+        if data_mode:
+            q = q.filter(cast(FareObservation.data_mode, String) == data_mode.upper())
+        if travel_date_from:
+            q = q.filter(FareObservation.travel_date >= travel_date_from)
+        if travel_date_to:
+            q = q.filter(FareObservation.travel_date <= travel_date_to)
 
-    total = q.count()
-    records = q.order_by(FareObservation.travel_date.desc()).offset(offset).limit(limit).all()
+        total = q.count()
+        records = q.order_by(FareObservation.travel_date.desc()).offset(offset).limit(limit).all()
 
-    return FaresResponse(
-        data=[FareRecord.model_validate(r) for r in records],
-        meta=PaginationMeta(total=total, limit=limit, offset=offset),
-    )
+        return FaresResponse(
+            data=[FareRecord.model_validate(r) for r in records],
+            meta=PaginationMeta(total=total, limit=limit, offset=offset),
+        )
+    except Exception as exc:
+        logger.error("Failed to query fares: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database query failed: {exc}",
+        )
 
 
 CITY_NAMES = {

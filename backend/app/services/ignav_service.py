@@ -191,31 +191,49 @@ class IgnavService:
         carrier = outbound.get("carrier")
         duration_minutes = outbound.get("duration_minutes")
 
-        airline_code = carrier
         airline_name: Optional[str] = None
         flight_number_str: Optional[str] = None
         dep_datetime: Optional[str] = None
         arr_datetime: Optional[str] = None
 
+        iata_map = {
+            "AIR INDIA": "AI",
+            "INDIGO": "6E",
+            "SPICEJET": "SG",
+            "VISTARA": "UK",
+            "AKASA AIR": "QP",
+            "AIR INDIA EXPRESS": "IX",
+            "GO FIRST": "G8",
+            "AIR ASIA INDIA": "I5",
+        }
+
+        airline_code = None
         if segments:
             first_seg = segments[0]
             last_seg = segments[-1]
 
             marketing_code = first_seg.get("marketing_carrier_code")
-            if not airline_code and marketing_code:
-                airline_code = marketing_code
+            if marketing_code and len(marketing_code.strip()) <= 3:
+                airline_code = marketing_code.strip().upper()
 
-            airline_name = first_seg.get("operating_carrier_name") or first_seg.get("marketing_carrier_code")
+            airline_name = first_seg.get("operating_carrier_name") or carrier
 
             raw_fn = first_seg.get("flight_number")
             if raw_fn:
-                flight_number_str = f"{airline_code}-{raw_fn}" if airline_code and not str(raw_fn).startswith(airline_code) else str(raw_fn)
+                flight_number_str = f"{airline_code or 'FL'}-{raw_fn}" if not str(raw_fn).startswith(str(airline_code or '')) else str(raw_fn)
 
             dep_datetime = first_seg.get("departure_time_local") or first_seg.get("departure_time_utc")
             arr_datetime = last_seg.get("arrival_time_local") or last_seg.get("arrival_time_utc")
 
             if duration_minutes is None:
                 duration_minutes = sum(s.get("duration_minutes", 0) for s in segments if isinstance(s.get("duration_minutes"), int))
+
+        if not airline_code and carrier:
+            c_norm = carrier.strip().upper()
+            airline_code = iata_map.get(c_norm, c_norm[:10])
+
+        if not airline_name:
+            airline_name = carrier or airline_code
 
         stops = max(0, len(segments) - 1)
         cabin_class = self._normalize_cabin_display(itin.get("cabin_class"))
