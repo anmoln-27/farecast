@@ -5,7 +5,13 @@
  * Uses VITE_API_BASE_URL if configured, otherwise falls back to window origin or dev proxy.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const RAW_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim();
+// If VITE_API_BASE_URL is empty, or points to dormant farecast-ml-api, route to live Render backend
+const API_BASE_URL = (!RAW_API_BASE_URL || RAW_API_BASE_URL.includes('farecast-ml-api'))
+  ? (typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname === 'farecast.vercel.app')
+      ? 'https://farecast-api.onrender.com'
+      : RAW_API_BASE_URL)
+  : RAW_API_BASE_URL;
 
 class ApiError extends Error {
   constructor(message, status, details = null) {
