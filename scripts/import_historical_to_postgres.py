@@ -133,8 +133,13 @@ def import_genuine_historical_data(
                 "TRUJET": "Trujet",
             }
 
+            from sqlalchemy import func, text
+            max_obs_id = session.query(func.max(FareObservation.id)).scalar() or 0
+            current_obs_id = max_obs_id
+
             obs_batch = []
             for item in raw_obs:
+                current_obs_id += 1
                 raw_code = str(item.get("airline_code") or "6E").strip()
                 norm_code = code_map.get(raw_code.upper(), raw_code)
                 if norm_code not in existing_airline_codes:
@@ -167,6 +172,7 @@ def import_genuine_historical_data(
                 fare_val = float(item["fare"])
 
                 obs = FareObservation(
+                    id=current_obs_id,
                     source=item.get("source") or "kaggle",
                     data_mode=DataMode.HISTORICAL,
                     airline_code=norm_code,
@@ -207,6 +213,13 @@ def import_genuine_historical_data(
                 session.commit()
                 total_imported_obs += len(obs_batch)
 
+            if session.bind and session.bind.dialect.name == "postgresql":
+                try:
+                    session.execute(text(f"SELECT setval(pg_get_serial_sequence('fare_observations', 'id'), {current_obs_id} + 1, false)"))
+                    session.commit()
+                except Exception as seq_err:
+                    logger.warning("Could not update fare_observations sequence: %s", seq_err)
+
             logger.info("Successfully imported %d genuine historical observations.", total_imported_obs)
         else:
             logger.info(
@@ -218,9 +231,14 @@ def import_genuine_historical_data(
         existing_index_count = session.query(AirfareIndex).count()
         if existing_index_count <= 10 and raw_indices:
             logger.info("Importing %d analytical AirfareIndex records...", len(raw_indices))
+            max_idx_id = session.query(func.max(AirfareIndex.id)).scalar() or 0
+            current_idx_id = max_idx_id
+
             idx_batch = []
             for item in raw_indices:
+                current_idx_id += 1
                 record = AirfareIndex(
+                    id=current_idx_id,
                     route=item.get("route"),
                     airline=item.get("airline") or "ALL",
                     period=item.get("period"),
@@ -249,6 +267,13 @@ def import_genuine_historical_data(
                 session.bulk_save_objects(idx_batch)
                 session.commit()
                 total_imported_indices += len(idx_batch)
+
+            if session.bind and session.bind.dialect.name == "postgresql":
+                try:
+                    session.execute(text(f"SELECT setval(pg_get_serial_sequence('airfare_index', 'id'), {current_idx_id} + 1, false)"))
+                    session.commit()
+                except Exception as seq_err:
+                    logger.warning("Could not update airfare_index sequence: %s", seq_err)
 
             logger.info("Successfully imported %d AirfareIndex records.", total_imported_indices)
 
