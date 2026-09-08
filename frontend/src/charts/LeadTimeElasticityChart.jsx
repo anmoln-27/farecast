@@ -63,7 +63,7 @@ export default function LeadTimeElasticityChart({ selectedRouteProp }) {
     }
   }, [selectedRouteProp, routesData]);
 
-  const availableRoutes = Object.keys(routesData);
+  const availableRoutes = Array.from(new Set(Object.keys(routesData))).sort();
   const data = routesData[selectedRoute] || routesData[availableRoutes[0]] || DEFAULT_ROUTE_DATA['DEL-BOM'];
   const t45 = data[0]?.total || 1;
   const t1 = data[data.length - 1]?.total || t45;

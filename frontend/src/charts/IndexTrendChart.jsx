@@ -12,11 +12,27 @@ import {
 import EmptyState from '../components/EmptyState';
 import { formatPeriod } from '../utils/formatters';
 
-export default function IndexTrendChart({ indexRecords = [] }) {
-  // Sort chronologically by period
-  const sorted = [...indexRecords]
-    .filter((r) => r.period && r.index_value !== null && !isNaN(r.index_value))
-    .sort((a, b) => a.period.localeCompare(b.period));
+export default function IndexTrendChart({ indexRecords = [], selectedRoute = null }) {
+  // If route is selected, filter by route; otherwise show AGGREGATE
+  let targetRecords = indexRecords;
+  if (selectedRoute) {
+    const routeFiltered = indexRecords.filter((r) => r.route === selectedRoute);
+    if (routeFiltered.length > 0) targetRecords = routeFiltered;
+  } else {
+    const aggRecords = indexRecords.filter((r) => r.route === 'AGGREGATE');
+    if (aggRecords.length > 0) targetRecords = aggRecords;
+  }
+
+  // Deduplicate by period if multiple sub_indices exist (favor COMPOSITE)
+  const dedupMap = {};
+  targetRecords.forEach((r) => {
+    if (!r.period || r.index_value == null || isNaN(r.index_value)) return;
+    if (!dedupMap[r.period] || r.sub_index === 'COMPOSITE') {
+      dedupMap[r.period] = r;
+    }
+  });
+
+  const sorted = Object.values(dedupMap).sort((a, b) => a.period.localeCompare(b.period));
 
   if (sorted.length === 0) {
     return (

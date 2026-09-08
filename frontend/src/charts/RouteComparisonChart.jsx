@@ -11,27 +11,41 @@ import {
 import EmptyState from '../components/EmptyState';
 import { formatINR } from '../utils/formatters';
 
-export default function RouteComparisonChart({ fares = [] }) {
-  // Aggregate fares by route
-  const routeMap = {};
-  fares.forEach((f) => {
-    if (!f.origin || !f.destination || !f.fare) return;
-    const rKey = `${f.origin}-${f.destination}`;
-    if (!routeMap[rKey]) {
-      routeMap[rKey] = { route: rKey, sum: 0, count: 0 };
-    }
-    routeMap[rKey].sum += f.fare;
-    routeMap[rKey].count += 1;
-  });
+export default function RouteComparisonChart({ fares = [], routeData = null }) {
+  let chartData = [];
 
-  const chartData = Object.values(routeMap)
-    .map((item) => ({
-      route: item.route,
-      avgFare: Math.round(item.sum / item.count),
-      count: item.count,
-    }))
-    .sort((a, b) => b.avgFare - a.avgFare)
-    .slice(0, 10); // Top 10 routes
+  if (Array.isArray(routeData) && routeData.length > 0) {
+    chartData = routeData
+      .filter((item) => item.route && item.avgFare)
+      .map((item) => ({
+        route: item.route,
+        avgFare: Math.round(item.avgFare),
+        count: item.count || 1,
+      }))
+      .sort((a, b) => b.avgFare - a.avgFare)
+      .slice(0, 10);
+  } else {
+    // Aggregate fares by route
+    const routeMap = {};
+    fares.forEach((f) => {
+      if (!f.origin || !f.destination || !f.fare) return;
+      const rKey = `${f.origin}-${f.destination}`;
+      if (!routeMap[rKey]) {
+        routeMap[rKey] = { route: rKey, sum: 0, count: 0 };
+      }
+      routeMap[rKey].sum += f.fare;
+      routeMap[rKey].count += 1;
+    });
+
+    chartData = Object.values(routeMap)
+      .map((item) => ({
+        route: item.route,
+        avgFare: Math.round(item.sum / item.count),
+        count: item.count,
+      }))
+      .sort((a, b) => b.avgFare - a.avgFare)
+      .slice(0, 10); // Top 10 routes
+  }
 
   if (chartData.length === 0) {
     return (

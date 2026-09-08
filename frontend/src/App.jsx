@@ -36,6 +36,7 @@ export default function App() {
 
   // Data States
   const [faresData, setFaresData] = useState(null);
+  const [faresAnalytics, setFaresAnalytics] = useState(null);
   const [indexData, setIndexData] = useState(null);
   const [anomaliesData, setAnomaliesData] = useState([]);
   const [dgcaData, setDgcaData] = useState([]);
@@ -91,7 +92,10 @@ export default function App() {
       // 2. Fetch Index
       const fetchIndexPromise = (currentFilters.origin && currentFilters.destination)
         ? api.getRouteIndex(currentFilters.origin, currentFilters.destination).catch(() => ({ data: [] }))
-        : api.getIndex({ limit: 100 });
+        : api.getIndex({
+            limit: 100,
+            airline: currentFilters.airline || undefined,
+          });
 
       // 3. Fetch Anomalies
       const anomalyParams = {
@@ -101,11 +105,18 @@ export default function App() {
           : undefined,
       };
 
-      const [faresRes, indexRes, anomaliesRes] = await Promise.allSettled([
+      const [analyticsRes, faresRes, indexRes, anomaliesRes] = await Promise.allSettled([
+        api.getFaresAnalytics(fareParams),
         api.getFares(fareParams),
         fetchIndexPromise,
         api.getAnomalies(anomalyParams),
       ]);
+
+      if (analyticsRes.status === 'fulfilled') {
+        setFaresAnalytics(analyticsRes.value);
+      } else {
+        setFaresAnalytics(null);
+      }
 
       if (faresRes.status === 'fulfilled') {
         setFaresData(faresRes.value);
@@ -208,7 +219,8 @@ export default function App() {
             {/* Fare Summary KPIs */}
             <FareSummary
               faresData={faresData}
-              summaryMeta={dashboardSummary}
+              summaryMeta={faresAnalytics?.summary || dashboardSummary}
+              isFiltered={Boolean(filters.origin || filters.destination || filters.airline || filters.cabin_class || filters.travel_date)}
             />
 
             {/* 4 Required Charts Grid */}
@@ -222,7 +234,10 @@ export default function App() {
                   </div>
                 </div>
                 <div className="panel-body">
-                  <FareTrendChart fares={faresData?.data || []} />
+                  <FareTrendChart
+                    fares={faresData?.data || []}
+                    trendData={faresAnalytics?.trend}
+                  />
                 </div>
               </div>
 
@@ -235,7 +250,10 @@ export default function App() {
                   </div>
                 </div>
                 <div className="panel-body">
-                  <IndexTrendChart indexRecords={indexData?.data || []} />
+                  <IndexTrendChart
+                    indexRecords={indexData?.data || []}
+                    selectedRoute={selectedRouteCode}
+                  />
                 </div>
               </div>
 
@@ -251,6 +269,7 @@ export default function App() {
                   <AirlineComparisonChart
                     fares={faresData?.data || []}
                     airlines={airlines}
+                    airlineData={faresAnalytics?.airline_comparison}
                   />
                 </div>
               </div>
@@ -264,7 +283,10 @@ export default function App() {
                   </div>
                 </div>
                 <div className="panel-body">
-                  <RouteComparisonChart fares={faresData?.data || []} />
+                  <RouteComparisonChart
+                    fares={faresData?.data || []}
+                    routeData={faresAnalytics?.route_comparison}
+                  />
                 </div>
               </div>
             </div>

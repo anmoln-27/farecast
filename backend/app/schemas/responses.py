@@ -28,6 +28,9 @@ class PaginationMeta(BaseModel):
     total: int
     limit: int
     offset: int
+    avg_fare: Optional[float] = None
+    min_fare: Optional[float] = None
+    max_fare: Optional[float] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -55,6 +58,39 @@ class FareRecord(BaseModel):
 class FaresResponse(BaseModel):
     data: List[FareRecord]
     meta: PaginationMeta
+
+
+class FareTrendPoint(BaseModel):
+    date: str
+    avgFare: float
+    count: int
+
+
+class AirlineComparisonItem(BaseModel):
+    airlineCode: str
+    avgFare: float
+    count: int
+
+
+class RouteComparisonItem(BaseModel):
+    route: str
+    avgFare: float
+    count: int
+
+
+class FareSummaryStats(BaseModel):
+    total_observations: int
+    avg_fare: Optional[float] = None
+    min_fare: Optional[float] = None
+    max_fare: Optional[float] = None
+
+
+class FareAnalyticsResponse(BaseModel):
+    status: str = "success"
+    summary: FareSummaryStats
+    trend: List[FareTrendPoint]
+    airline_comparison: List[AirlineComparisonItem]
+    route_comparison: List[RouteComparisonItem]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -277,6 +313,7 @@ class LiveSearchResponse(BaseModel):
     offers: List[LiveFareOffer]
     total: int
     persisted_count: int = 0
+    error_detail: Optional[str] = None
 
 
 class LiveStatusResponse(BaseModel):

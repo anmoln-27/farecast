@@ -12,30 +12,47 @@ import {
 import EmptyState from '../components/EmptyState';
 import { formatINR } from '../utils/formatters';
 
-export default function AirlineComparisonChart({ fares = [], airlines = [] }) {
-  // Aggregate fares by airline
-  const airlineMap = {};
-  fares.forEach((f) => {
-    if (!f.airline_code || !f.fare) return;
-    const code = f.airline_code;
-    if (!airlineMap[code]) {
-      airlineMap[code] = { code, sum: 0, count: 0 };
-    }
-    airlineMap[code].sum += f.fare;
-    airlineMap[code].count += 1;
-  });
+export default function AirlineComparisonChart({ fares = [], airlines = [], airlineData = null }) {
+  let chartData = [];
 
-  const chartData = Object.values(airlineMap)
-    .map((item) => {
-      const match = airlines.find((a) => a.code === item.code);
-      return {
-        airlineCode: item.code,
-        airlineName: match ? match.name : item.code,
-        avgFare: Math.round(item.sum / item.count),
-        count: item.count,
-      };
-    })
-    .sort((a, b) => a.avgFare - b.avgFare);
+  if (Array.isArray(airlineData) && airlineData.length > 0) {
+    chartData = airlineData
+      .filter((item) => item.airlineCode && item.avgFare)
+      .map((item) => {
+        const match = airlines.find((a) => a.code === item.airlineCode);
+        return {
+          airlineCode: item.airlineCode,
+          airlineName: match ? match.name : item.airlineCode,
+          avgFare: Math.round(item.avgFare),
+          count: item.count || 1,
+        };
+      })
+      .sort((a, b) => a.avgFare - b.avgFare);
+  } else {
+    // Aggregate fares by airline
+    const airlineMap = {};
+    fares.forEach((f) => {
+      if (!f.airline_code || !f.fare) return;
+      const code = f.airline_code;
+      if (!airlineMap[code]) {
+        airlineMap[code] = { code, sum: 0, count: 0 };
+      }
+      airlineMap[code].sum += f.fare;
+      airlineMap[code].count += 1;
+    });
+
+    chartData = Object.values(airlineMap)
+      .map((item) => {
+        const match = airlines.find((a) => a.code === item.code);
+        return {
+          airlineCode: item.code,
+          airlineName: match ? match.name : item.code,
+          avgFare: Math.round(item.sum / item.count),
+          count: item.count,
+        };
+      })
+      .sort((a, b) => a.avgFare - b.avgFare);
+  }
 
   if (chartData.length === 0) {
     return (

@@ -81,7 +81,7 @@ export default function SectorHeatmap() {
             Domestic Sector Surge Pricing Heatmap
           </h3>
           <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-secondary, #718096)' }}>
-            Real-time price intensity matrix across domestic traffic routes and advance-purchase windows
+            Empirical historical sector matrix across domestic traffic routes and advance-purchase windows
           </p>
         </div>
 
@@ -113,7 +113,7 @@ export default function SectorHeatmap() {
           </thead>
           <tbody>
             {sectors.map((sector) => {
-              const baseFare = sector.fares['T+45'] || sector.fares['T+30'] || sector.fares['T+15'] || 1;
+              const baseFare = sector.fares ? (sector.fares['T+45'] || sector.fares['T+30'] || sector.fares['T+15'] || 1) : 1;
               return (
                 <tr key={sector.route}>
                   <td style={{ padding: '8px 12px', fontWeight: 600, color: '#0F2537', background: '#F7FAFC', borderRadius: '4px' }}>
@@ -123,13 +123,14 @@ export default function SectorHeatmap() {
                     {sector.dgcaWeight}
                   </td>
                   {WINDOWS.map((win) => {
-                    const fare = sector.fares[win];
-                    const colorStyle = getIntensityColor(fare, baseFare);
-                    const mult = (fare / baseFare).toFixed(2);
+                    const fare = sector.fares ? sector.fares[win] : null;
+                    const hasData = fare != null && !isNaN(fare) && Number(fare) > 0;
+                    const colorStyle = hasData ? getIntensityColor(fare, baseFare) : { bg: '#F8FAFC', text: '#94A3B8', border: '#E2E8F0' };
+                    const mult = hasData && baseFare > 0 ? (fare / baseFare).toFixed(2) : null;
                     return (
                       <td
                         key={win}
-                        onMouseEnter={() => setHoveredCell({ sector: sector.route, win, fare, mult })}
+                        onMouseEnter={() => hasData && setHoveredCell({ sector: sector.route, win, fare, mult })}
                         onMouseLeave={() => setHoveredCell(null)}
                         style={{
                           textAlign: 'center',
@@ -139,12 +140,21 @@ export default function SectorHeatmap() {
                           color: colorStyle.text,
                           border: `1px solid ${colorStyle.border}`,
                           fontWeight: 700,
-                          cursor: 'pointer',
+                          cursor: hasData ? 'pointer' : 'default',
                           transition: 'transform 0.15s ease',
                         }}
                       >
-                        <div>{formatINR(fare)}</div>
-                        <div style={{ fontSize: '10px', opacity: 0.85, fontWeight: 500 }}>{mult}x base</div>
+                        {hasData ? (
+                          <>
+                            <div>{formatINR(fare)}</div>
+                            <div style={{ fontSize: '10px', opacity: 0.85, fontWeight: 500 }}>{mult}x base</div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontSize: '14px', color: '#94A3B8', fontWeight: 600 }}>—</div>
+                            <div style={{ fontSize: '9px', color: '#94A3B8', fontWeight: 500 }}>No obs</div>
+                          </>
+                        )}
                       </td>
                     );
                   })}

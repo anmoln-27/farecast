@@ -14,6 +14,7 @@ export default function LiveSearchSection({ liveStatus }) {
 
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
+  const [fetchedAt, setFetchedAt] = useState(null);
   const [error, setError] = useState(null);
 
   const handleSearch = async (e) => {
@@ -29,28 +30,29 @@ export default function LiveSearchSection({ liveStatus }) {
     try {
       const res = await api.searchLiveFares(params);
       setResults(res);
+      setFetchedAt(new Date().toLocaleTimeString() + ' (' + new Date().toISOString().slice(0, 19) + ' UTC)');
     } catch (err) {
       setError(err.message || 'Live flight search query failed.');
       setResults(null);
+      setFetchedAt(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const mode = results?.data_mode || (liveStatus?.active_provider === 'IGNAV' ? 'LIVE' : (liveStatus?.demo_mode ? 'DEMO' : 'HISTORICAL'));
-  const isLive = results ? results.data_mode === 'LIVE' : (liveStatus?.active_provider === 'IGNAV' || liveStatus?.mode_label?.includes('LIVE'));
-  const providerName = results?.source || (liveStatus?.active_provider === 'IGNAV' ? 'IGNAV' : (liveStatus?.amadeus_configured ? 'AMADEUS' : 'LIVE'));
+  const isLive = results ? results.data_mode === 'LIVE' : (liveStatus?.active_provider === 'IGNAV');
+  const providerName = results?.source || (liveStatus?.active_provider === 'IGNAV' ? 'IGNAV' : 'LIVE');
 
   return (
     <div className="panel full-width" id="section-live-search">
       <div className="panel-header">
         <div className="panel-title-group">
-          <span className="panel-title">LIVE AIRFARE SEARCH ({providerName} API)</span>
-          <span className="panel-subtitle">Real-time live flight search with automated DEMO historical fallback</span>
+          <span className="panel-title">LIVE FLIGHT SEARCH ({providerName} API)</span>
+          <span className="panel-subtitle">On-demand real-time flight search direct from live provider</span>
         </div>
         <div className={`status-indicator ${isLive ? 'live' : 'demo'}`}>
           <span className="status-dot"></span>
-          <span>{isLive ? `LIVE ${providerName}` : 'DEMO MODE FALLBACK'}</span>
+          <span>{isLive ? `LIVE (${providerName})` : 'HISTORICAL / DEMO FALLBACK'}</span>
         </div>
       </div>
 
@@ -156,6 +158,8 @@ export default function LiveSearchSection({ liveStatus }) {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '8px',
                 padding: '10px 14px',
                 background: isLive ? '#ECFDF5' : '#FFFBEB',
                 border: `1px solid ${isLive ? '#A7F3D0' : '#FDE68A'}`,
@@ -166,15 +170,33 @@ export default function LiveSearchSection({ liveStatus }) {
               }}
             >
               <div>
-                <strong>Data Mode: {results.data_mode}</strong> — Source: {results.source}. {results.disclaimer}
+                <strong>Data Mode: {results.data_mode}</strong> — Source: <strong>{results.source}</strong>.
+                {fetchedAt && <span> Fetched at: <strong className="mono-num">{fetchedAt}</strong>.</span>}
+                <div>{results.disclaimer}</div>
               </div>
               <div style={{ fontWeight: 600 }}>{results.total} Offer{results.total === 1 ? '' : 's'}</div>
             </div>
 
+            {results.error_detail && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '12px',
+                  color: '#991B1B',
+                  marginBottom: '16px',
+                }}
+              >
+                <strong>Provider Note:</strong> {results.error_detail}
+              </div>
+            )}
+
             {results.offers.length === 0 ? (
               <EmptyState
-                title="No flight offers returned"
-                message="The live flight search provider returned zero offers for this specific date and route."
+                title="No live offers returned"
+                message="The live flight search provider returned zero offers for this specific date and route. Try another date or route."
               />
             ) : (
               <div className="data-table-wrapper">

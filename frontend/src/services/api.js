@@ -93,6 +93,19 @@ export const api = {
     return request(`/api/fares${qs ? `?${qs}` : ''}`);
   },
 
+  getFaresAnalytics: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.origin) query.append('origin', params.origin);
+    if (params.destination) query.append('destination', params.destination);
+    if (params.airline) query.append('airline', params.airline);
+    if (params.cabin_class) query.append('cabin_class', params.cabin_class);
+    if (params.travel_date_from) query.append('travel_date_from', params.travel_date_from);
+    if (params.travel_date_to) query.append('travel_date_to', params.travel_date_to);
+
+    const qs = query.toString();
+    return request(`/api/fares/analytics${qs ? `?${qs}` : ''}`);
+  },
+
   getLeadTimeElasticity: (params = {}) => {
     const query = new URLSearchParams();
     if (params.origin) query.append('origin', params.origin);
@@ -106,8 +119,12 @@ export const api = {
   // Prototype Index
   getIndex: (params = {}) => {
     const query = new URLSearchParams();
+    if (params.route) query.append('route', params.route);
+    if (params.airline) query.append('airline', params.airline);
     if (params.period) query.append('period', params.period);
     if (params.period_type) query.append('period_type', params.period_type);
+    if (params.frequency) query.append('frequency', params.frequency);
+    if (params.sub_index) query.append('sub_index', params.sub_index);
     if (params.limit) query.append('limit', params.limit || 100);
     if (params.offset) query.append('offset', params.offset || 0);
 

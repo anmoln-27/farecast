@@ -185,8 +185,14 @@ def live_search(
             )
         except Exception as exc:
             # Fall back to DEMO mode if Ignav request fails, without claiming to be LIVE
-            logger.error("Ignav live search failed (%s), safely falling back to DEMO", type(exc).__name__)
-            return _demo_fallback(origin, destination, db, settings)
+            logger.error("Ignav live search failed (%s), safely falling back to DEMO: %s", type(exc).__name__, exc)
+            return _demo_fallback(
+                origin,
+                destination,
+                db,
+                settings,
+                error_detail=f"Live search via Ignav encountered an issue: {exc}. Displaying verified historical observations fallback.",
+            )
 
     # ── 2. Amadeus Provider (Alternative/Future) ──────────────────────────────
     if settings.amadeus_available:
@@ -341,6 +347,7 @@ def _demo_fallback(
     destination: str,
     db: Session,
     settings: Settings,
+    error_detail: Optional[str] = None,
 ) -> LiveSearchResponse:
     """
     Return clearly-labelled HISTORICAL/DEMO data from the local DB.
@@ -382,7 +389,8 @@ def _demo_fallback(
     return LiveSearchResponse(
         data_mode=mode,
         source="HISTORICAL",
-        disclaimer=_DEMO_DISCLAIMER,
+        disclaimer=error_detail or _DEMO_DISCLAIMER,
         offers=offers,
         total=len(offers),
+        error_detail=error_detail,
     )

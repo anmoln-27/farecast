@@ -213,6 +213,18 @@ class TestFares:
         resp = api_client.get("/api/fares")
         assert "secret" not in resp.text.lower()
 
+    def test_fares_analytics_dynamic(self, api_client):
+        resp = api_client.get("/api/fares/analytics?origin=DEL&destination=BOM")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert "summary" in data
+        assert "trend" in data
+        assert "airline_comparison" in data
+        assert "route_comparison" in data
+        assert data["summary"]["total_observations"] >= 1
+        assert data["summary"]["avg_fare"] is not None
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Routes

@@ -2,26 +2,35 @@ import React from 'react';
 import { formatPercent } from '../utils/formatters';
 
 export default function IndexSection({ indexData, selectedRoute }) {
-  // If we have index records
   const records = indexData?.data || [];
-  const latestRecord = records.length > 0 ? records[0] : null;
-  const indexValue = latestRecord?.index_value;
-  const baselineFare = latestRecord?.baseline_fare;
-  const avgFare = latestRecord?.avg_fare;
-  const period = latestRecord?.period || 'Latest Period';
+
+  // Match specific route if filtered, otherwise find national AGGREGATE
+  let activeRecord = null;
+  if (selectedRoute) {
+    activeRecord = records.find((r) => r.route === selectedRoute) || records[0];
+  } else {
+    activeRecord = records.find((r) => r.route === 'AGGREGATE') || records[0];
+  }
+
+  const indexValue = activeRecord?.index_value;
+  const baselineFare = activeRecord?.baseline_fare;
+  const avgFare = activeRecord?.avg_fare;
+  const period = activeRecord?.period || 'Latest Period';
+  const baselinePeriod = activeRecord?.baseline_period || '2022-02';
+  const displayRoute = activeRecord?.route || selectedRoute || 'National Aggregate';
 
   // Calculate change vs baseline (base is 100)
-  const changeVsBaseline = indexValue ? indexValue - 100 : null;
+  const changeVsBaseline = indexValue != null ? indexValue - 100 : null;
 
   return (
     <section className="index-banner" aria-label="Prototype Airfare Price Index">
       <div className="index-details">
         <span className="prototype-tag">PROTOTYPE INDEX</span>
         <h2 className="index-title serif-heading">
-          {selectedRoute ? `Route Price Index: ${selectedRoute}` : 'National Airfare Price Index (Prototype)'}
+          {selectedRoute ? `Route Price Index: ${selectedRoute}` : `National Airfare Price Index (${displayRoute})`}
         </h2>
         <p className="index-disclaimer">
-          Experimental benchmark computed from historical fare observations using equal-weight methodology (Base Period = 100).
+          Experimental benchmark computed from historical fare observations using equal-weight / DGCA traffic methodology (Base = 100.0, Baseline: {baselinePeriod} @ {baselineFare ? `₹${Math.round(baselineFare)}` : 'Ref'}).
           <strong> NOT an official Government of India statistical publication.</strong>
         </p>
       </div>

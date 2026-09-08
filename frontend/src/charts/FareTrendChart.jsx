@@ -11,26 +11,39 @@ import {
 import EmptyState from '../components/EmptyState';
 import { formatINR, formatDate } from '../utils/formatters';
 
-export default function FareTrendChart({ fares = [] }) {
-  // Aggregate fares by date to get average fare per date
-  const dataMap = {};
-  fares.forEach((f) => {
-    if (!f.travel_date || !f.fare) return;
-    const dStr = f.travel_date;
-    if (!dataMap[dStr]) {
-      dataMap[dStr] = { date: dStr, sum: 0, count: 0 };
-    }
-    dataMap[dStr].sum += f.fare;
-    dataMap[dStr].count += 1;
-  });
+export default function FareTrendChart({ fares = [], trendData = null }) {
+  let chartData = [];
 
-  const chartData = Object.values(dataMap)
-    .map((item) => ({
-      date: item.date,
-      avgFare: Math.round(item.sum / item.count),
-      count: item.count,
-    }))
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  if (Array.isArray(trendData) && trendData.length > 0) {
+    chartData = trendData
+      .filter((item) => item.date && item.avgFare)
+      .map((item) => ({
+        date: item.date,
+        avgFare: Math.round(item.avgFare),
+        count: item.count || 1,
+      }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+  } else {
+    // Aggregate fares by date to get average fare per date
+    const dataMap = {};
+    fares.forEach((f) => {
+      if (!f.travel_date || !f.fare) return;
+      const dStr = f.travel_date;
+      if (!dataMap[dStr]) {
+        dataMap[dStr] = { date: dStr, sum: 0, count: 0 };
+      }
+      dataMap[dStr].sum += f.fare;
+      dataMap[dStr].count += 1;
+    });
+
+    chartData = Object.values(dataMap)
+      .map((item) => ({
+        date: item.date,
+        avgFare: Math.round(item.sum / item.count),
+        count: item.count,
+      }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+  }
 
   if (chartData.length === 0) {
     return (

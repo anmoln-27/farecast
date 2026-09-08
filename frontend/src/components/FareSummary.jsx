@@ -1,19 +1,18 @@
 import React from 'react';
 import { formatINR, formatNumber } from '../utils/formatters';
 
-export default function FareSummary({ faresData, summaryMeta }) {
-  // ── Primary: use pre-aggregated stats from the backend dashboard summary ──
-  // These cover the FULL dataset (not a paginated 100-record subset).
-  const totalObservations = summaryMeta?.total_fare_observations ?? (faresData?.meta?.total ?? 0);
+export default function FareSummary({ faresData, summaryMeta, isFiltered = false }) {
+  // Use dynamically calculated stats from filtered query / analytics
+  const totalObservations =
+    summaryMeta?.total_observations ??
+    (isFiltered ? (faresData?.meta?.total ?? 0) : (summaryMeta?.total_fare_observations ?? faresData?.meta?.total ?? 0));
 
-  // Backend now returns avg_fare, min_fare, max_fare computed via SQL over all rows.
-  // Fall back to computing from the local faresData page only if summaryMeta aggregates are absent.
-  let avgFare = (summaryMeta?.avg_fare != null) ? summaryMeta.avg_fare : null;
-  let minFare = (summaryMeta?.min_fare != null) ? summaryMeta.min_fare : null;
-  let maxFare = (summaryMeta?.max_fare != null) ? summaryMeta.max_fare : null;
+  let avgFare = summaryMeta?.avg_fare ?? faresData?.meta?.avg_fare ?? null;
+  let minFare = summaryMeta?.min_fare ?? faresData?.meta?.min_fare ?? null;
+  let maxFare = summaryMeta?.max_fare ?? faresData?.meta?.max_fare ?? null;
 
   if (avgFare === null || minFare === null || maxFare === null) {
-    // Fallback: compute from paginated records (partial dataset)
+    // Fallback: compute from records in faresData
     const records = faresData?.data || [];
     if (records.length > 0) {
       const fares = records.map((r) => Number(r.fare)).filter((f) => !isNaN(f) && f > 0);
@@ -25,6 +24,10 @@ export default function FareSummary({ faresData, summaryMeta }) {
     }
   }
 
+  const deltaText = isFiltered
+    ? `Filtered subset (${formatNumber(totalObservations)} flights)`
+    : `Across ${formatNumber(totalObservations)} historical records`;
+
   return (
     <section className="summary-grid" aria-label="Fare Observations Summary">
       <div className="summary-card highlight">
@@ -33,7 +36,7 @@ export default function FareSummary({ faresData, summaryMeta }) {
           {formatINR(avgFare)}
         </div>
         <div className="summary-delta">
-          Across {formatNumber(totalObservations)} historical records
+          {deltaText}
         </div>
       </div>
 
