@@ -281,9 +281,13 @@ def import_genuine_historical_data(
         existing_dgca_count = session.query(DGCAAviationStat).count()
         if existing_dgca_count <= 5 and raw_dgca:
             logger.info("Importing %d DGCA aviation stats...", len(raw_dgca))
+            max_dgca_id = session.query(func.max(DGCAAviationStat.id)).scalar() or 0
+            current_dgca_id = max_dgca_id
             dgca_batch = []
             for item in raw_dgca:
+                current_dgca_id += 1
                 rec = DGCAAviationStat(
+                    id=current_dgca_id,
                     period=item.get("period"),
                     airline=item.get("airline"),
                     origin=item.get("origin"),
@@ -302,8 +306,58 @@ def import_genuine_historical_data(
                 session.commit()
                 total_imported_dgca += len(dgca_batch)
 
+            if session.bind and session.bind.dialect.name == "postgresql":
+                try:
+                    session.execute(text(f"SELECT setval(pg_get_serial_sequence('dgca_aviation_stats', 'id'), {current_dgca_id} + 1, false)"))
+                    session.commit()
+                except Exception as seq_err:
+                    logger.warning("Could not update dgca sequence: %s", seq_err)
+
+        # ── 6. Ensure all 30 routes exist in routes table ────────────────────
+        CITY_NAMES = {
+            "DEL": "Delhi", "BOM": "Mumbai", "BLR": "Bengaluru",
+            "CCU": "Kolkata", "HYD": "Hyderabad", "MAA": "Chennai",
+            "GOI": "Goa", "PNQ": "Pune", "AMD": "Ahmedabad",
+        }
+        DISTANCES = {
+            ("DEL", "BOM"): 1148.0, ("BOM", "DEL"): 1148.0,
+            ("DEL", "BLR"): 1740.0, ("BLR", "DEL"): 1740.0,
+            ("DEL", "CCU"): 1305.0, ("CCU", "DEL"): 1305.0,
+            ("DEL", "HYD"): 1253.0, ("HYD", "DEL"): 1253.0,
+            ("DEL", "MAA"): 1760.0, ("MAA", "DEL"): 1760.0,
+            ("BOM", "BLR"): 842.0,  ("BLR", "BOM"): 842.0,
+            ("BOM", "CCU"): 1654.0, ("CCU", "BOM"): 1654.0,
+            ("BOM", "HYD"): 621.0,  ("HYD", "BOM"): 621.0,
+            ("BOM", "MAA"): 1033.0, ("MAA", "BOM"): 1033.0,
+            ("BLR", "CCU"): 1560.0, ("CCU", "BLR"): 1560.0,
+            ("BLR", "HYD"): 500.0,  ("HYD", "BLR"): 500.0,
+            ("BLR", "MAA"): 290.0,  ("MAA", "BLR"): 290.0,
+            ("CCU", "HYD"): 1180.0, ("HYD", "CCU"): 1180.0,
+            ("CCU", "MAA"): 1366.0, ("MAA", "CCU"): 1366.0,
+            ("HYD", "MAA"): 510.0,  ("MAA", "HYD"): 510.0,
+            ("BOM", "GOI"): 435.0,  ("GOI", "BOM"): 435.0,
+            ("DEL", "PNQ"): 1173.0, ("PNQ", "DEL"): 1173.0,
+        }
+        obs_routes = session.query(FareObservation.origin, FareObservation.destination).distinct().all()
+        for orig, dest in obs_routes:
+            if not orig or not dest:
+                continue
+            existing_route = session.query(Route).filter_by(origin=orig, destination=dest).first()
+            if not existing_route:
+                dist = DISTANCES.get((orig, dest), 1000.0)
+                session.add(Route(
+                    origin=orig,
+                    destination=dest,
+                    origin_city=CITY_NAMES.get(orig, orig),
+                    destination_city=CITY_NAMES.get(dest, dest),
+                    distance_km=dist,
+                    is_domestic=True
+                ))
+        session.commit()
+
         final_obs_count = session.query(FareObservation).count()
         final_index_count = session.query(AirfareIndex).count()
+        final_route_count = session.query(Route).count()
 
         return {
             "status": "success",
@@ -312,6 +366,7 @@ def import_genuine_historical_data(
             "imported_dgca": total_imported_dgca,
             "total_observations_in_db": final_obs_count,
             "total_indices_in_db": final_index_count,
+            "total_routes_in_db": final_route_count,
         }
 
     except Exception as exc:
