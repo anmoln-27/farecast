@@ -212,7 +212,7 @@ export default function NsoRbiPortal() {
               <ShieldCheck size={20} color="#2B6CB0" />
               <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F2537' }}>
                 {backtestData.validation_mode === 'EMPIRICAL_HISTORICAL_OUT_OF_SAMPLE'
-                  ? '30+ Day Empirical Out-of-Sample Historical Backtest (30,114 Real Flights)'
+                  ? '30+ Day Empirical Out-of-Sample Backtest (30,114 Real Flights)'
                   : '30-Day Backtesting Suite — Synthetic Benchmark Simulation (Methodology Demo)'}
               </h3>
             </div>
@@ -281,7 +281,7 @@ export default function NsoRbiPortal() {
 
             <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '6px', border: '1px solid #EDF2F7' }}>
               <div style={{ fontSize: '11px', color: '#718096', textTransform: 'uppercase', fontWeight: 600 }}>
-                {backtestMode === 'empirical' ? 'Evaluated Historical Flights' : 'Tracking Error Spread'}
+                {backtestMode === 'empirical' ? 'Evaluated Observations' : 'Tracking Error Spread'}
               </div>
               <div style={{ fontSize: '20px', fontWeight: 700, color: '#2B6CB0' }}>
                 {backtestMode === 'empirical'

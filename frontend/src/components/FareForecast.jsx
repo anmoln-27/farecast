@@ -297,7 +297,7 @@ export default function FareForecast({ defaultOrigin = 'DEL', defaultDestination
                 lineHeight: 1.4,
               }}
             >
-              <strong>Disclaimer:</strong> {prediction.disclaimer || 'Predictions are model-based estimates based on historical patterns. Actual fares vary based on real-time seat inventory, dynamic pricing, and booking timing.'}
+              <strong>Disclaimer:</strong> {prediction.disclaimer || 'Predictions are model-based estimates based on observed patterns. Actual fares vary based on real-time seat inventory, dynamic pricing, and booking timing.'}
             </div>
           </div>
         )}

@@ -72,7 +72,7 @@ export default function IndexSection({ indexData, selectedRoute, selectedDate })
             : isNearestPeriod
             ? "Using available observations — no records for the exact selected date. "
             : ""}
-          Experimental airfare benchmark with Base Period = 100 (Baseline: {baselinePeriod} @ {baselineFare ? `₹${Math.round(baselineFare)}` : 'Ref'}).
+          Experimental airfare benchmark with Base Period = 100.
           <strong> Not an official Government of India statistical publication.</strong>
         </p>
       </div>
