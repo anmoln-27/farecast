@@ -49,7 +49,7 @@ export default function FareTrendChart({ fares = [], trendData = null }) {
     return (
       <EmptyState
         title="No fare trend observations"
-        message="No historical observations available for this selection. Adjust filters to view fare movements."
+        message="No observations available for this selection. Adjust filters to view fare movements."
       />
     );
   }

@@ -231,7 +231,7 @@ export default function App() {
                 <div className="panel-header">
                   <div className="panel-title-group">
                     <span className="panel-title">FARE MOVEMENT TREND</span>
-                    <span className="panel-subtitle">Average historical fare movement over observation timeline</span>
+                    <span className="panel-subtitle">Average fare movement over observation timeline</span>
                   </div>
                 </div>
                 <div className="panel-body">
@@ -247,7 +247,7 @@ export default function App() {
                 <div className="panel-header">
                   <div className="panel-title-group">
                     <span className="panel-title">PROTOTYPE PRICE INDEX TREND</span>
-                    <span className="panel-subtitle">Historical index movement against baseline (Base = 100.0)</span>
+                    <span className="panel-subtitle">Airfare index movement against baseline (Base = 100.0)</span>
                   </div>
                 </div>
                 <div className="panel-body">

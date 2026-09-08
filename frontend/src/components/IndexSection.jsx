@@ -40,7 +40,6 @@ export default function IndexSection({ indexData, selectedRoute, selectedDate })
 
   const indexValue = activeRecord?.index_value;
   const baselineFare = activeRecord?.baseline_fare;
-  const avgFare = activeRecord?.avg_fare;
   const period = activeRecord?.period || 'Latest Period';
   const baselinePeriod = activeRecord?.baseline_period || '2022-02';
   const displayRoute = activeRecord?.route || selectedRoute || 'National Aggregate';
@@ -49,13 +48,13 @@ export default function IndexSection({ indexData, selectedRoute, selectedDate })
   const changeVsBaseline = indexValue != null ? indexValue - 100 : null;
 
   return (
-    <section className="index-banner" aria-label="Prototype Airfare Price Index">
+    <section className="index-banner" aria-label="Airfare Price Index">
       <div className="index-details">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
-          <span className="prototype-tag">PROTOTYPE INDEX</span>
+          <span className="prototype-tag">AIRFARE PRICE INDEX</span>
           {isNearestPeriod && (
             <span style={{ fontSize: '11px', background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
-              Nearest Available Historical Period
+              Nearest Available Period
             </span>
           )}
           {isFallbackAggregate && (
@@ -71,10 +70,10 @@ export default function IndexSection({ indexData, selectedRoute, selectedDate })
           {isFallbackAggregate
             ? "Route-specific index unavailable. Showing documented national aggregate index as baseline. "
             : isNearestPeriod
-            ? "Index shown for the nearest available historical period. "
+            ? "Using available observations — no records for the exact selected date. "
             : ""}
-          Experimental benchmark computed from historical fare observations using equal-weight / DGCA traffic methodology (Base = 100.0, Baseline: {baselinePeriod} @ {baselineFare ? `₹${Math.round(baselineFare)}` : 'Ref'}).
-          <strong> NOT an official Government of India statistical publication.</strong>
+          Experimental airfare benchmark with Base Period = 100 (Baseline: {baselinePeriod} @ {baselineFare ? `₹${Math.round(baselineFare)}` : 'Ref'}).
+          <strong> Not an official Government of India statistical publication.</strong>
         </p>
       </div>
 

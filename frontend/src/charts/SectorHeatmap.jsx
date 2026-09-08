@@ -81,7 +81,7 @@ export default function SectorHeatmap() {
             Domestic Sector Surge Pricing Heatmap
           </h3>
           <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-secondary, #718096)' }}>
-            Empirical historical sector matrix across domestic traffic routes and advance-purchase windows
+            Empirical sector matrix across domestic traffic routes and advance-purchase windows
           </p>
         </div>
 

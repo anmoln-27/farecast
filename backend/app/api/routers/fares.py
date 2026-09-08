@@ -104,7 +104,7 @@ def list_fares(
                     min_fare = round(float(agg_r[2]), 2) if agg_r[2] is not None else None
                     max_fare = round(float(agg_r[3]), 2) if agg_r[3] is not None else None
                     is_fallback = True
-                    fallback_message = "Using available historical observations — no records for exact selected date."
+                    fallback_message = "Using available observations — no records for the exact selected date."
 
         records = q.order_by(FareObservation.travel_date.desc()).offset(offset).limit(limit).all()
 
@@ -203,7 +203,7 @@ def get_fares_analytics(
                     total_obs, avg_f, min_f, max_f = cnt_b, avg_b, min_b, max_b
                     is_fallback = True
                     fallback_level = "relaxed_date"
-                    fallback_message = "Using available historical observations — no records for exact selected date."
+                    fallback_message = "Using available observations — no records for the exact selected date."
 
             # Step C: Relax airline if still 0
             if total_obs == 0 and airline:
@@ -214,7 +214,7 @@ def get_fares_analytics(
                     total_obs, avg_f, min_f, max_f = cnt_c, avg_c, min_c, max_c
                     is_fallback = True
                     fallback_level = "relaxed_airline"
-                    fallback_message = "Using available historical observations for route — no records for selected airline on this date."
+                    fallback_message = "Using available observations for route — no records for selected airline on this date."
 
             # Step D: Relax cabin_class if still 0
             if total_obs == 0 and cabin_class:
@@ -225,7 +225,7 @@ def get_fares_analytics(
                     total_obs, avg_f, min_f, max_f = cnt_d, avg_d, min_d, max_d
                     is_fallback = True
                     fallback_level = "relaxed_cabin"
-                    fallback_message = "Using available historical observations for route."
+                    fallback_message = "Using available observations for route."
 
             # Step E: Full dataset fallback if still 0
             if total_obs == 0:
@@ -236,7 +236,7 @@ def get_fares_analytics(
                     total_obs, avg_f, min_f, max_f = cnt_e, avg_e, min_e, max_e
                     is_fallback = True
                     fallback_level = "full_dataset"
-                    fallback_message = "Using full historical dataset baseline."
+                    fallback_message = "Using dataset baseline."
 
         summary = FareSummaryStats(
             total_observations=total_obs,

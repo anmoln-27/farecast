@@ -27,13 +27,13 @@ export default function FareSummary({ faresData, summaryMeta, isFiltered = false
   const isFallback = Boolean(summaryMeta?.is_fallback);
   const fallbackMessage =
     summaryMeta?.fallback_message ||
-    'Using available historical observations — no records for exact selected date.';
+    'Using available observations — no records for the exact selected date.';
 
   const deltaText = isFallback
     ? fallbackMessage
     : isFiltered
     ? `Filtered subset (${formatNumber(totalObservations)} flights)`
-    : `Across ${formatNumber(totalObservations)} historical records`;
+    : `Across ${formatNumber(totalObservations)} observations`;
 
   return (
     <section className="summary-grid" aria-label="Fare Observations Summary">
@@ -95,7 +95,7 @@ export default function FareSummary({ faresData, summaryMeta, isFiltered = false
           {formatNumber(totalObservations)}
         </div>
         <div className="summary-delta">
-          {isFallback ? 'Available historical flights' : 'Verified historical records'}
+          {isFallback ? 'Available observations' : 'Verified observations'}
         </div>
       </div>
     </section>
