@@ -1,17 +1,32 @@
 /**
  * FARECAST API Service Layer
- * 
+ *
  * Interacts with the FastAPI backend.
- * Uses VITE_API_BASE_URL if configured, otherwise falls back to window origin or dev proxy.
+ * Resolution priority:
+ *   1. VITE_API_BASE_URL if explicitly set and valid (not the dormant farecast-ml-api host)
+ *   2. Empty string on localhost (Vite dev proxy handles /api/* transparently)
+ *   3. Absolute Render backend URL for ALL other deployments (Vercel, staging, etc.)
+ *      This avoids relying on Vercel rewrite proxies, which can fail due to catch-all ordering.
  */
 
+const RENDER_BACKEND = 'https://farecast-api.onrender.com';
+
 const RAW_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim();
-// If VITE_API_BASE_URL is empty, or points to dormant farecast-ml-api, route to live Render backend
-const API_BASE_URL = (!RAW_API_BASE_URL || RAW_API_BASE_URL.includes('farecast-ml-api'))
-  ? (typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname === 'farecast.vercel.app')
-      ? 'https://farecast-api.onrender.com'
-      : RAW_API_BASE_URL)
-  : RAW_API_BASE_URL;
+const isExplicitValidUrl =
+  RAW_API_BASE_URL &&
+  !RAW_API_BASE_URL.includes('farecast-ml-api') &&
+  RAW_API_BASE_URL.startsWith('http');
+
+const isLocalhost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+// Use explicit env URL if set; use empty on localhost (Vite proxy); else always use Render directly
+const API_BASE_URL = isExplicitValidUrl
+  ? RAW_API_BASE_URL
+  : isLocalhost
+    ? ''
+    : RENDER_BACKEND;
 
 class ApiError extends Error {
   constructor(message, status, details = null) {

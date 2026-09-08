@@ -9,7 +9,7 @@
       "destination": "https://farecast-api.onrender.com/health"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api|health|assets).*)",
       "destination": "/index.html"
     }
   ]
