@@ -24,18 +24,47 @@ export default function FareSummary({ faresData, summaryMeta, isFiltered = false
     }
   }
 
-  const deltaText = isFiltered
+  const isFallback = Boolean(summaryMeta?.is_fallback);
+  const fallbackMessage =
+    summaryMeta?.fallback_message ||
+    'Using available historical observations — no records for exact selected date.';
+
+  const deltaText = isFallback
+    ? fallbackMessage
+    : isFiltered
     ? `Filtered subset (${formatNumber(totalObservations)} flights)`
     : `Across ${formatNumber(totalObservations)} historical records`;
 
   return (
     <section className="summary-grid" aria-label="Fare Observations Summary">
+      {isFallback && (
+        <div
+          style={{
+            gridColumn: '1 / -1',
+            backgroundColor: '#FFFBEB',
+            border: '1px solid #FDE68A',
+            borderRadius: '8px',
+            padding: '10px 16px',
+            fontSize: '12px',
+            color: '#92400E',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: 500,
+            marginBottom: '4px',
+          }}
+        >
+          <span style={{ fontSize: '14px' }}>ℹ️</span>
+          <span>{fallbackMessage}</span>
+        </div>
+      )}
+
       <div className="summary-card highlight">
         <div className="summary-label">Average Observed Fare</div>
         <div className="summary-value mono-num" id="stat-avg-fare">
           {formatINR(avgFare)}
         </div>
-        <div className="summary-delta">
+        <div className="summary-delta" style={{ color: isFallback ? '#B45309' : undefined }}>
           {deltaText}
         </div>
       </div>
@@ -66,7 +95,7 @@ export default function FareSummary({ faresData, summaryMeta, isFiltered = false
           {formatNumber(totalObservations)}
         </div>
         <div className="summary-delta">
-          Verified historical records
+          {isFallback ? 'Available historical flights' : 'Verified historical records'}
         </div>
       </div>
     </section>

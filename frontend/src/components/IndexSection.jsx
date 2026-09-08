@@ -1,15 +1,41 @@
 import React from 'react';
 import { formatPercent } from '../utils/formatters';
 
-export default function IndexSection({ indexData, selectedRoute }) {
+export default function IndexSection({ indexData, selectedRoute, selectedDate }) {
   const records = indexData?.data || [];
 
   // Match specific route if filtered, otherwise find national AGGREGATE
   let activeRecord = null;
-  if (selectedRoute) {
-    activeRecord = records.find((r) => r.route === selectedRoute) || records[0];
+  let isNearestPeriod = false;
+  let isFallbackAggregate = false;
+
+  const routeRecords = selectedRoute
+    ? records.filter((r) => r.route === selectedRoute)
+    : records.filter((r) => r.route === 'AGGREGATE');
+
+  let pool = routeRecords;
+  if (pool.length === 0) {
+    // If route-specific index is missing, fallback to AGGREGATE
+    pool = records.filter((r) => r.route === 'AGGREGATE');
+    isFallbackAggregate = true;
+  }
+  if (pool.length === 0) {
+    pool = records;
+  }
+
+  if (selectedDate && pool.length > 0) {
+    // Check if exact date/period matches (e.g., 2022-04-01 or 2022-04)
+    const exactMatch = pool.find(
+      (r) => r.period === selectedDate || selectedDate.startsWith(r.period) || (r.period && r.period.startsWith(selectedDate.slice(0, 7)))
+    );
+    if (exactMatch) {
+      activeRecord = exactMatch;
+    } else {
+      activeRecord = pool[0];
+      isNearestPeriod = true;
+    }
   } else {
-    activeRecord = records.find((r) => r.route === 'AGGREGATE') || records[0];
+    activeRecord = pool[0] || null;
   }
 
   const indexValue = activeRecord?.index_value;
@@ -25,11 +51,28 @@ export default function IndexSection({ indexData, selectedRoute }) {
   return (
     <section className="index-banner" aria-label="Prototype Airfare Price Index">
       <div className="index-details">
-        <span className="prototype-tag">PROTOTYPE INDEX</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+          <span className="prototype-tag">PROTOTYPE INDEX</span>
+          {isNearestPeriod && (
+            <span style={{ fontSize: '11px', background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+              Nearest Available Historical Period
+            </span>
+          )}
+          {isFallbackAggregate && (
+            <span style={{ fontSize: '11px', background: '#E0E7FF', color: '#3730A3', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+              National Aggregate Baseline
+            </span>
+          )}
+        </div>
         <h2 className="index-title serif-heading">
-          {selectedRoute ? `Route Price Index: ${selectedRoute}` : `National Airfare Price Index (${displayRoute})`}
+          {selectedRoute && !isFallbackAggregate ? `Route Price Index: ${selectedRoute}` : `National Airfare Price Index (${displayRoute})`}
         </h2>
         <p className="index-disclaimer">
+          {isFallbackAggregate
+            ? "Route-specific index unavailable. Showing documented national aggregate index as baseline. "
+            : isNearestPeriod
+            ? "Index shown for the nearest available historical period. "
+            : ""}
           Experimental benchmark computed from historical fare observations using equal-weight / DGCA traffic methodology (Base = 100.0, Baseline: {baselinePeriod} @ {baselineFare ? `₹${Math.round(baselineFare)}` : 'Ref'}).
           <strong> NOT an official Government of India statistical publication.</strong>
         </p>
@@ -54,7 +97,7 @@ export default function IndexSection({ indexData, selectedRoute }) {
               }}
               className="mono-num"
             >
-              {changeVsBaseline !== null ? `${changeVsBaseline > 0 ? '↑' : '↓'} ${formatPercent(changeVsBaseline)}` : 'Index unavailable — insufficient observations'}
+              {changeVsBaseline !== null ? `${changeVsBaseline > 0 ? '↑' : '↓'} ${formatPercent(changeVsBaseline)}` : 'Index unavailable'}
             </div>
             <div className="index-baseline-ref">vs. Baseline</div>
           </div>

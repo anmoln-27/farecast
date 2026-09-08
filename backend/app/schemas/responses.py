@@ -31,6 +31,8 @@ class PaginationMeta(BaseModel):
     avg_fare: Optional[float] = None
     min_fare: Optional[float] = None
     max_fare: Optional[float] = None
+    is_fallback: bool = False
+    fallback_message: Optional[str] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -83,6 +85,9 @@ class FareSummaryStats(BaseModel):
     avg_fare: Optional[float] = None
     min_fare: Optional[float] = None
     max_fare: Optional[float] = None
+    is_fallback: bool = False
+    fallback_level: Optional[str] = None
+    fallback_message: Optional[str] = None
 
 
 class FareAnalyticsResponse(BaseModel):
@@ -91,6 +96,8 @@ class FareAnalyticsResponse(BaseModel):
     trend: List[FareTrendPoint]
     airline_comparison: List[AirlineComparisonItem]
     route_comparison: List[RouteComparisonItem]
+    exact_match_found: bool = True
+    context_note: Optional[str] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -75,6 +75,36 @@ def list_fares(
         avg_fare = round(float(agg[1]), 2) if agg and agg[1] is not None else None
         min_fare = round(float(agg[2]), 2) if agg and agg[2] is not None else None
         max_fare = round(float(agg[3]), 2) if agg and agg[3] is not None else None
+        is_fallback = False
+        fallback_message = None
+
+        if total == 0:
+            # Fallback for list_fares: relax date restrictions if set
+            if travel_date_from or travel_date_to:
+                q_relaxed = db.query(FareObservation)
+                if origin:
+                    q_relaxed = q_relaxed.filter(func.upper(FareObservation.origin) == origin.upper())
+                if destination:
+                    q_relaxed = q_relaxed.filter(func.upper(FareObservation.destination) == destination.upper())
+                if airline:
+                    q_relaxed = q_relaxed.filter(func.upper(FareObservation.airline_code) == airline.upper())
+                if cabin_class:
+                    q_relaxed = q_relaxed.filter(cast(FareObservation.cabin_class, String).ilike(f"%{cabin_class}%"))
+                
+                agg_r = q_relaxed.with_entities(
+                    func.count(FareObservation.id),
+                    func.avg(FareObservation.fare),
+                    func.min(FareObservation.fare),
+                    func.max(FareObservation.fare),
+                ).first()
+                if agg_r and agg_r[0]:
+                    q = q_relaxed
+                    total = int(agg_r[0])
+                    avg_fare = round(float(agg_r[1]), 2) if agg_r[1] is not None else None
+                    min_fare = round(float(agg_r[2]), 2) if agg_r[2] is not None else None
+                    max_fare = round(float(agg_r[3]), 2) if agg_r[3] is not None else None
+                    is_fallback = True
+                    fallback_message = "Using available historical observations — no records for exact selected date."
 
         records = q.order_by(FareObservation.travel_date.desc()).offset(offset).limit(limit).all()
 
@@ -87,6 +117,8 @@ def list_fares(
                 avg_fare=avg_fare,
                 min_fare=min_fare,
                 max_fare=max_fare,
+                is_fallback=is_fallback,
+                fallback_message=fallback_message,
             ),
         )
     except Exception as exc:
@@ -112,50 +144,127 @@ def get_fares_analytics(
     """
     Returns dynamically computed statistical aggregates and complete time-series curves
     for the exact filtered subset of observations across the entire database.
+    If the exact filter combination produces zero observations, progressively relaxes
+    filters (date -> airline -> cabin -> full dataset) to provide faithful historical context.
     """
     try:
-        q = db.query(FareObservation)
+        def build_q(orig, dest, airl, cabin, adv, mode, date_from, date_to):
+            query = db.query(FareObservation)
+            if orig:
+                query = query.filter(func.upper(FareObservation.origin) == orig.upper())
+            if dest:
+                query = query.filter(func.upper(FareObservation.destination) == dest.upper())
+            if airl:
+                query = query.filter(func.upper(FareObservation.airline_code) == airl.upper())
+            if cabin:
+                query = query.filter(cast(FareObservation.cabin_class, String).ilike(f"%{cabin}%"))
+            if adv:
+                query = query.filter(FareObservation.advance_window == adv.upper())
+            if mode:
+                query = query.filter(cast(FareObservation.data_mode, String) == mode.upper())
+            if date_from:
+                query = query.filter(FareObservation.travel_date >= date_from)
+            if date_to:
+                query = query.filter(FareObservation.travel_date <= date_to)
+            return query
 
-        if origin:
-            q = q.filter(func.upper(FareObservation.origin) == origin.upper())
-        if destination:
-            q = q.filter(func.upper(FareObservation.destination) == destination.upper())
-        if airline:
-            q = q.filter(func.upper(FareObservation.airline_code) == airline.upper())
-        if cabin_class:
-            q = q.filter(cast(FareObservation.cabin_class, String).ilike(f"%{cabin_class}%"))
-        if advance_window:
-            q = q.filter(FareObservation.advance_window == advance_window.upper())
-        if data_mode:
-            q = q.filter(cast(FareObservation.data_mode, String) == data_mode.upper())
-        if travel_date_from:
-            q = q.filter(FareObservation.travel_date >= travel_date_from)
-        if travel_date_to:
-            q = q.filter(FareObservation.travel_date <= travel_date_to)
+        def get_agg(query):
+            res = query.with_entities(
+                func.count(FareObservation.id),
+                func.avg(FareObservation.fare),
+                func.min(FareObservation.fare),
+                func.max(FareObservation.fare),
+            ).first()
+            cnt = int(res[0]) if res and res[0] else 0
+            avg_val = round(float(res[1]), 2) if res and res[1] is not None else None
+            min_val = round(float(res[2]), 2) if res and res[2] is not None else None
+            max_val = round(float(res[3]), 2) if res and res[3] is not None else None
+            return cnt, avg_val, min_val, max_val
 
-        # 1. Summary KPIs across all filtered rows
-        agg = q.with_entities(
-            func.count(FareObservation.id),
-            func.avg(FareObservation.fare),
-            func.min(FareObservation.fare),
-            func.max(FareObservation.fare),
-        ).first()
+        # Step A: Try user's exact filters
+        q = build_q(origin, destination, airline, cabin_class, advance_window, data_mode, travel_date_from, travel_date_to)
+        total_obs, avg_f, min_f, max_f = get_agg(q)
 
-        total_obs = int(agg[0]) if agg and agg[0] else 0
-        avg_f = round(float(agg[1]), 2) if agg and agg[1] is not None else None
-        min_f = round(float(agg[2]), 2) if agg and agg[2] is not None else None
-        max_f = round(float(agg[3]), 2) if agg and agg[3] is not None else None
+        is_fallback = False
+        fallback_level = "exact"
+        fallback_message = None
+        exact_match_found = True
+
+        # Progressive relaxation if 0 observations
+        if total_obs == 0:
+            exact_match_found = False
+
+            # Step B: Relax date restrictions only
+            if travel_date_from or travel_date_to:
+                q_b = build_q(origin, destination, airline, cabin_class, advance_window, data_mode, None, None)
+                cnt_b, avg_b, min_b, max_b = get_agg(q_b)
+                if cnt_b > 0:
+                    q = q_b
+                    total_obs, avg_f, min_f, max_f = cnt_b, avg_b, min_b, max_b
+                    is_fallback = True
+                    fallback_level = "relaxed_date"
+                    fallback_message = "Using available historical observations — no records for exact selected date."
+
+            # Step C: Relax airline if still 0
+            if total_obs == 0 and airline:
+                q_c = build_q(origin, destination, None, cabin_class, advance_window, data_mode, None, None)
+                cnt_c, avg_c, min_c, max_c = get_agg(q_c)
+                if cnt_c > 0:
+                    q = q_c
+                    total_obs, avg_f, min_f, max_f = cnt_c, avg_c, min_c, max_c
+                    is_fallback = True
+                    fallback_level = "relaxed_airline"
+                    fallback_message = "Using available historical observations for route — no records for selected airline on this date."
+
+            # Step D: Relax cabin_class if still 0
+            if total_obs == 0 and cabin_class:
+                q_d = build_q(origin, destination, None, None, advance_window, data_mode, None, None)
+                cnt_d, avg_d, min_d, max_d = get_agg(q_d)
+                if cnt_d > 0:
+                    q = q_d
+                    total_obs, avg_f, min_f, max_f = cnt_d, avg_d, min_d, max_d
+                    is_fallback = True
+                    fallback_level = "relaxed_cabin"
+                    fallback_message = "Using available historical observations for route."
+
+            # Step E: Full dataset fallback if still 0
+            if total_obs == 0:
+                q_e = build_q(None, None, None, None, None, data_mode, None, None)
+                cnt_e, avg_e, min_e, max_e = get_agg(q_e)
+                if cnt_e > 0:
+                    q = q_e
+                    total_obs, avg_f, min_f, max_f = cnt_e, avg_e, min_e, max_e
+                    is_fallback = True
+                    fallback_level = "full_dataset"
+                    fallback_message = "Using full historical dataset baseline."
 
         summary = FareSummaryStats(
             total_observations=total_obs,
             avg_fare=avg_f,
             min_fare=min_f,
             max_fare=max_f,
+            is_fallback=is_fallback,
+            fallback_level=fallback_level,
+            fallback_message=fallback_message,
         )
 
         # 2. Fare Movement Trend: Complete time-series grouped by travel_date
+        trend_q = q
+        # If single date was filtered, compute trend across available dates for the route/airline context
+        if travel_date_from and travel_date_to and travel_date_from == travel_date_to:
+            trend_q = build_q(
+                origin,
+                destination,
+                airline if fallback_level != "relaxed_airline" else None,
+                cabin_class if fallback_level not in ("relaxed_airline", "relaxed_cabin") else None,
+                advance_window,
+                data_mode,
+                None,
+                None,
+            )
+
         trend_rows = (
-            q.with_entities(
+            trend_q.with_entities(
                 FareObservation.travel_date,
                 func.avg(FareObservation.fare).label("avg_fare"),
                 func.count(FareObservation.id).label("count"),
@@ -175,6 +284,30 @@ def get_fares_analytics(
             if r[0] is not None and r[1] is not None
         ]
 
+        if len(trend) <= 1 and (origin or destination):
+            broad_trend_rows = (
+                build_q(origin, destination, None, None, None, data_mode, None, None)
+                .with_entities(
+                    FareObservation.travel_date,
+                    func.avg(FareObservation.fare).label("avg_fare"),
+                    func.count(FareObservation.id).label("count"),
+                )
+                .filter(FareObservation.travel_date.isnot(None))
+                .group_by(FareObservation.travel_date)
+                .order_by(FareObservation.travel_date.asc())
+                .all()
+            )
+            if broad_trend_rows:
+                trend = [
+                    FareTrendPoint(
+                        date=str(r[0]),
+                        avgFare=round(float(r[1])),
+                        count=int(r[2]),
+                    )
+                    for r in broad_trend_rows
+                    if r[0] is not None and r[1] is not None
+                ]
+
         # 3. Airline Fare Comparison: All airlines in the filtered subset
         airline_code_upper = func.upper(FareObservation.airline_code).label("airline_code")
         airline_rows = (
@@ -188,6 +321,20 @@ def get_fares_analytics(
             .order_by(func.avg(FareObservation.fare).asc())
             .all()
         )
+        if len(airline_rows) == 0 and (origin or destination):
+            # Relax to route airlines
+            airline_rows = (
+                build_q(origin, destination, None, None, None, data_mode, None, None)
+                .with_entities(
+                    airline_code_upper,
+                    func.avg(FareObservation.fare).label("avg_fare"),
+                    func.count(FareObservation.id).label("count"),
+                )
+                .filter(FareObservation.airline_code.isnot(None))
+                .group_by(airline_code_upper)
+                .order_by(func.avg(FareObservation.fare).asc())
+                .all()
+            )
         airline_comparison = [
             AirlineComparisonItem(
                 airlineCode=str(r[0]),
@@ -214,6 +361,21 @@ def get_fares_analytics(
             .limit(15)
             .all()
         )
+        if len(route_rows) == 0:
+            route_rows = (
+                build_q(None, None, None, None, None, data_mode, None, None)
+                .with_entities(
+                    origin_upper,
+                    dest_upper,
+                    func.avg(FareObservation.fare).label("avg_fare"),
+                    func.count(FareObservation.id).label("count"),
+                )
+                .filter(FareObservation.origin.isnot(None), FareObservation.destination.isnot(None))
+                .group_by(origin_upper, dest_upper)
+                .order_by(func.avg(FareObservation.fare).desc())
+                .limit(15)
+                .all()
+            )
         route_comparison = [
             RouteComparisonItem(
                 route=f"{r[0]}-{r[1]}",
@@ -230,6 +392,8 @@ def get_fares_analytics(
             trend=trend,
             airline_comparison=airline_comparison,
             route_comparison=route_comparison,
+            exact_match_found=exact_match_found,
+            context_note=fallback_message,
         )
     except Exception as exc:
         logger.error("Failed to query fare analytics: %s", exc, exc_info=True)

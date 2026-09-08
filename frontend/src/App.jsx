@@ -214,6 +214,7 @@ export default function App() {
             <IndexSection
               indexData={indexData}
               selectedRoute={selectedRouteCode}
+              selectedDate={filters.travel_date}
             />
 
             {/* Fare Summary KPIs */}

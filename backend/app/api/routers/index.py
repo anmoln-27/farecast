@@ -86,10 +86,21 @@ def route_index(
     )
 
     if not records:
+        aggregate_records = (
+            db.query(AirfareIndex)
+            .filter(AirfareIndex.route == "AGGREGATE")
+            .order_by(AirfareIndex.period.desc())
+            .all()
+        )
+        if aggregate_records:
+            return IndexResponse(
+                disclaimer="Route-specific index unavailable for this sector. Showing national aggregate index baseline.",
+                data=[IndexRecord.model_validate(r) for r in aggregate_records],
+                total=len(aggregate_records),
+            )
         raise HTTPException(
             status_code=404,
-            detail=f"No index records found for route {route_code}. "
-                   "Run the index engine first to generate index data.",
+            detail=f"No index records found for route {route_code} or AGGREGATE.",
         )
 
     return IndexResponse(

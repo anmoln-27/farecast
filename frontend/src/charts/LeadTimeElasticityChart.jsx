@@ -120,7 +120,12 @@ export default function LeadTimeElasticityChart({ selectedRouteProp }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <label htmlFor="elasticity-route-dropdown" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary, #4A5568)' }}>
+            Sector:
+          </label>
           <select
+            id="elasticity-route-dropdown"
+            className="filter-select"
             value={selectedRoute}
             onChange={(e) => setSelectedRoute(e.target.value)}
             style={{
@@ -130,11 +135,15 @@ export default function LeadTimeElasticityChart({ selectedRouteProp }) {
               fontSize: '13px',
               fontWeight: 600,
               color: '#0F2537',
-              backgroundColor: '#F7FAFC',
+              backgroundColor: '#FFFFFF',
+              minWidth: '130px',
+              cursor: 'pointer',
             }}
           >
             {availableRoutes.map((r) => (
-              <option key={r} value={r}>{r}</option>
+              <option key={r} value={r}>
+                {r}
+              </option>
             ))}
           </select>
 
