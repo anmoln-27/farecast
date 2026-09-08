@@ -93,6 +93,36 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.warning("Startup database check warning: %s", exc)
 
+        # Seed genuine historical observations if database has fewer than 100 records
+        try:
+            from backend.app.db.base import SessionLocal
+            from backend.app.db.models import FareObservation, DataMode
+            from scripts.import_historical_to_postgres import import_genuine_historical_data
+
+            db = SessionLocal()()
+            try:
+                hist_count = (
+                    db.query(FareObservation)
+                    .filter(FareObservation.data_mode == DataMode.HISTORICAL)
+                    .count()
+                )
+                if hist_count < 100:
+                    logger.info(
+                        "Database has only %d historical records (< 100). Auto-seeding genuine historical dataset...",
+                        hist_count,
+                    )
+                    res = import_genuine_historical_data(session=db)
+                    logger.info("Auto-seed historical dataset completed: %s", res)
+                else:
+                    logger.info(
+                        "Database already contains %d historical records. Skipping auto-seed.",
+                        hist_count,
+                    )
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.warning("Historical auto-seed check warning: %s", exc)
+
     logger.info(
         "FARECAST API started | DEMO_MODE=%s | Ignav=%s | Amadeus=%s",
         settings.DEMO_MODE,

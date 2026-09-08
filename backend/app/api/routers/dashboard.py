@@ -58,3 +58,13 @@ def dashboard_summary(
         ignav_configured=settings.ignav_available,
         data_modes_present=data_modes,
     )
+
+
+@router.post("/seed-historical", summary="Seed genuine historical dataset into database")
+def seed_historical_endpoint(db: Session = Depends(get_db)) -> dict:
+    """
+    Safely imports the genuine 30,114 historical airfare observations into PostgreSQL.
+    Idempotent: skips if already populated.
+    """
+    from scripts.import_historical_to_postgres import import_genuine_historical_data
+    return import_genuine_historical_data(session=db)
