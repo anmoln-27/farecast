@@ -132,8 +132,13 @@ export const api = {
     return request(`/api/index${qs ? `?${qs}` : ''}`);
   },
 
-  getRouteIndex: (origin, destination) => {
-    return request(`/api/index/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}`);
+  getRouteIndex: (origin, destination, params = {}) => {
+    const query = new URLSearchParams();
+    if (params.airline) query.append('airline', params.airline);
+    if (params.cabin_class) query.append('cabin_class', params.cabin_class);
+    if (params.travel_date) query.append('travel_date', params.travel_date);
+    const qs = query.toString();
+    return request(`/api/index/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}${qs ? `?${qs}` : ''}`);
   },
 
   // Fare Forecast / ML Prediction

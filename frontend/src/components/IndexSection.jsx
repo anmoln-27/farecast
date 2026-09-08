@@ -1,7 +1,14 @@
 import React from 'react';
 import { formatPercent } from '../utils/formatters';
 
-export default function IndexSection({ indexData, selectedRoute, selectedDate }) {
+export default function IndexSection({
+  indexData,
+  selectedRoute,
+  selectedDate,
+  summaryMeta,
+  filteredAirline,
+  filteredCabin,
+}) {
   const records = indexData?.data || [];
 
   // Match specific route if filtered, otherwise find national AGGREGATE
@@ -20,8 +27,16 @@ export default function IndexSection({ indexData, selectedRoute, selectedDate })
     pool = records;
   }
 
+  // Filter out any anomalous records starting with 'W-' or isolated test scrapes from 2023
+  // to ensure only genuine observation timeline records are used.
+  pool = pool.filter(
+    (r) => !r.period || (!r.period.startsWith('W-') && !r.period.startsWith('2023') && r.period !== '2022-06-15')
+  );
+
+  // Check if selectedDate matches base period (e.g. 2022-02 or 2022-02-xx)
+  const isBasePeriod = selectedDate && (selectedDate === '2022-02' || selectedDate.startsWith('2022-02'));
+
   if (selectedDate && pool.length > 0) {
-    // Check if exact date/period matches (e.g., 2022-04-01 or 2022-04)
     const exactMatch = pool.find(
       (r) => r.period === selectedDate || selectedDate.startsWith(r.period) || (r.period && r.period.startsWith(selectedDate.slice(0, 7)))
     );
@@ -34,9 +49,22 @@ export default function IndexSection({ indexData, selectedRoute, selectedDate })
     activeRecord = pool[0] || null;
   }
 
-  const indexValue = activeRecord?.index_value;
-  const period = activeRecord?.period || 'Latest Period';
+  let indexValue = activeRecord?.index_value;
+  let baselineFare = activeRecord?.baseline_fare;
+  const period = isBasePeriod ? '2022-02 (Base Period)' : (activeRecord?.period || 'Latest Period');
   const displayRoute = selectedRoute || activeRecord?.route || 'National Aggregate';
+
+  // Base Period is always strictly normalized to 100.0
+  if (isBasePeriod) {
+    indexValue = 100.0;
+  } else if (selectedRoute && summaryMeta?.avg_fare && baselineFare && baselineFare > 0) {
+    if (filteredAirline || filteredCabin) {
+      // Dynamic route price index: (current filtered fare / route reference-period baseline) * 100
+      indexValue = activeRecord?.index_value != null && activeRecord.index_value >= 40
+        ? activeRecord.index_value
+        : Number(((summaryMeta.avg_fare / baselineFare) * 100).toFixed(1));
+    }
+  }
 
   // Calculate change vs baseline (base is 100)
   const changeVsBaseline = indexValue != null ? indexValue - 100 : null;
@@ -63,7 +91,7 @@ export default function IndexSection({ indexData, selectedRoute, selectedDate })
               Period: {period}
             </div>
             <div className="index-large-val mono-num">
-              {indexValue !== null && indexValue !== undefined ? indexValue.toFixed(1) : '—'}
+              {indexValue !== null && indexValue !== undefined ? Number(indexValue).toFixed(1) : '—'}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>

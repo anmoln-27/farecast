@@ -91,7 +91,11 @@ export default function App() {
 
       // 2. Fetch Index
       const fetchIndexPromise = (currentFilters.origin && currentFilters.destination)
-        ? api.getRouteIndex(currentFilters.origin, currentFilters.destination).catch(() => ({ data: [] }))
+        ? api.getRouteIndex(currentFilters.origin, currentFilters.destination, {
+            airline: currentFilters.airline || undefined,
+            cabin_class: currentFilters.cabin_class || undefined,
+            travel_date: currentFilters.travel_date || undefined,
+          }).catch(() => ({ data: [] }))
         : api.getIndex({
             limit: 100,
             airline: currentFilters.airline || undefined,
@@ -215,6 +219,9 @@ export default function App() {
               indexData={indexData}
               selectedRoute={selectedRouteCode}
               selectedDate={filters.travel_date}
+              summaryMeta={faresAnalytics?.summary || dashboardSummary}
+              filteredAirline={filters.airline}
+              filteredCabin={filters.cabin_class}
             />
 
             {/* Fare Summary KPIs */}
