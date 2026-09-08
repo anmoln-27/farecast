@@ -78,7 +78,7 @@ export default function IndexTrendChart({ indexRecords = [] }) {
             fontSize={11}
             tickLine={false}
             axisLine={false}
-            domain={[80, 140]}
+            domain={['auto', 'auto']}
           />
           <ReferenceLine
             y={100}

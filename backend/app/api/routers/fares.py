@@ -238,6 +238,7 @@ def get_sector_matrix(db: Session = Depends(get_db)) -> dict:
         "status": "success",
         "data_mode": "HISTORICAL",
         "sectors": sorted_sectors,
+        "data": sorted_sectors,
         "total_sectors": len(sorted_sectors),
         "weight_source": weight_provenance,
         "provenance_note": (

@@ -271,7 +271,7 @@ export default function App() {
 
             {/* Lead-Time Elasticity Surge Curve */}
             <div style={{ marginTop: '24px' }}>
-              <LeadTimeElasticityChart />
+              <LeadTimeElasticityChart selectedRouteProp={selectedRouteCode} />
             </div>
 
             {/* Sector Surge Pricing Heatmap */}
@@ -306,7 +306,7 @@ export default function App() {
         {/* Tab: Surge & Elasticity Heatmaps */}
         {activeTab === 'elasticity' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginTop: '12px' }}>
-            <LeadTimeElasticityChart />
+            <LeadTimeElasticityChart selectedRouteProp={selectedRouteCode} />
             <SectorHeatmap />
           </div>
         )}

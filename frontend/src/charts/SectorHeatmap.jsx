@@ -57,8 +57,9 @@ export default function SectorHeatmap() {
       setLoading(true);
       try {
         const res = await api.getSectorMatrix();
-        if (isMounted && res?.data && res.data.length > 0) {
-          setSectors(res.data);
+        const matrixData = res?.data || res?.sectors;
+        if (isMounted && Array.isArray(matrixData) && matrixData.length > 0) {
+          setSectors(matrixData);
         }
       } catch (err) {
         console.error('Failed to load sector heatmap matrix:', err);

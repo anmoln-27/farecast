@@ -25,6 +25,8 @@ _DISCLAIMER = (
 
 @router.get("/index", response_model=IndexResponse, summary="Prototype Airfare Price Index")
 def list_index(
+    route: Optional[str] = Query(None, description="Route filter, e.g. DEL-BOM"),
+    airline: Optional[str] = Query(None, description="Airline filter, e.g. 6E or ALL"),
     period: Optional[str] = Query(None, description="Filter by period, e.g. 2022-01"),
     period_type: Optional[str] = Query(None, description="month / quarter / year"),
     frequency: Optional[str] = Query(None, description="daily / weekly / monthly"),
@@ -38,6 +40,10 @@ def list_index(
     NOT an official Government of India statistical index.
     """
     q = db.query(AirfareIndex)
+    if route:
+        q = q.filter(AirfareIndex.route == route.upper())
+    if airline:
+        q = q.filter(AirfareIndex.airline == airline.upper())
     if period:
         q = q.filter(AirfareIndex.period == period)
     if period_type:

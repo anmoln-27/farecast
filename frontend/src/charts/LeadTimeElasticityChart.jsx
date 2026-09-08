@@ -28,8 +28,8 @@ const DEFAULT_ROUTE_DATA = {
   ],
 };
 
-export default function LeadTimeElasticityChart() {
-  const [selectedRoute, setSelectedRoute] = useState('DEL-BOM');
+export default function LeadTimeElasticityChart({ selectedRouteProp }) {
+  const [selectedRoute, setSelectedRoute] = useState(selectedRouteProp || 'DEL-BOM');
   const [viewMode, setViewMode] = useState('curve'); // 'curve' | 'disaggregated'
   const [routesData, setRoutesData] = useState(DEFAULT_ROUTE_DATA);
   const [loading, setLoading] = useState(false);
@@ -42,9 +42,10 @@ export default function LeadTimeElasticityChart() {
         const res = await api.getLeadTimeElasticity();
         if (isMounted && res?.data && Object.keys(res.data).length > 0) {
           setRoutesData(res.data);
-          if (!res.data[selectedRoute]) {
-            setSelectedRoute(Object.keys(res.data)[0]);
-          }
+          const initialRoute = selectedRouteProp && res.data[selectedRouteProp]
+            ? selectedRouteProp
+            : (res.data[selectedRoute] ? selectedRoute : Object.keys(res.data)[0]);
+          setSelectedRoute(initialRoute);
         }
       } catch (err) {
         console.error('Failed to load elasticity data:', err);
@@ -56,11 +57,18 @@ export default function LeadTimeElasticityChart() {
     return () => { isMounted = false; };
   }, []);
 
+  useEffect(() => {
+    if (selectedRouteProp && routesData[selectedRouteProp]) {
+      setSelectedRoute(selectedRouteProp);
+    }
+  }, [selectedRouteProp, routesData]);
+
   const availableRoutes = Object.keys(routesData);
   const data = routesData[selectedRoute] || routesData[availableRoutes[0]] || DEFAULT_ROUTE_DATA['DEL-BOM'];
   const t45 = data[0]?.total || 1;
   const t1 = data[data.length - 1]?.total || t45;
   const surgePct = Math.round(((t1 - t45) / t45) * 100);
+  const surgeMultiple = t45 > 0 ? (t1 / t45).toFixed(2) + 'x' : '1.00x';
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -183,7 +191,7 @@ export default function LeadTimeElasticityChart() {
 
         <div style={{ background: '#F7FAFC', padding: '10px 14px', borderRadius: '6px', borderLeft: '3px solid #319795' }}>
           <div style={{ fontSize: '11px', color: '#718096', textTransform: 'uppercase', fontWeight: 600 }}>Elasticity Surge Multiple</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: '#0F2537' }}>3.25x</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: '#0F2537' }}>{surgeMultiple}</div>
           <div style={{ fontSize: '11px', color: '#718096' }}>Peak yield management ratio</div>
         </div>
       </div>
